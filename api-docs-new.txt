@@ -1,0 +1,845 @@
+================================================================================
+  COLLEGEHUB BACKEND — API DOCUMENTATION
+  Base URL: http://localhost:5000
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AUTHENTICATION MECHANISM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All protected endpoints use cookie-based JWT authentication. No Authorization
+header is needed.
+
+Cookie name : token
+Cookie flags: HttpOnly | Secure (production) | SameSite=Strict | MaxAge=7d
+
+The cookie is automatically set on /register and /login, and cleared on /logout.
+Every request to a protected route must include the cookie (credentials: true).
+
+Middleware:
+  protect      — verifies the JWT from req.cookies.token; injects req.user
+                  { userId: ObjectId, role: "ADMIN"|"FACULTY"|"STUDENT" }
+  authorize()  — role guard; must follow protect in the chain
+
+Error responses from middleware:
+  401  { "message": "Not authorized" }          — cookie missing
+  401  { "message": "Token invalid" }           — bad / expired token
+  403  { "message": "Access denied" }           — role not permitted
+
+
+================================================================================
+  1. AUTH  —  /api/auth
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/auth/register
+────────────────────────────────────────────────────────────────────────────────
+Middleware : none
+Roles      : public
+
+Request body (JSON):
+  {
+    "email"    : "string  — required, unique",
+    "password" : "string  — required, plain text (hashed server-side)",
+    "role"     : "string  — required, one of: ADMIN | FACULTY | STUDENT"
+  }
+
+Success 201:
+  Sets-Cookie: token=<jwt>; HttpOnly; ...
+  {
+    "message": "User created",
+    "user": {
+      "id"   : "<ObjectId>",
+      "email": "user@example.com",
+      "role" : "STUDENT"
+    }
+  }
+
+Errors:
+  400  { "message": "User already exists" }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/auth/login
+────────────────────────────────────────────────────────────────────────────────
+Middleware : none
+Roles      : public
+
+Request body (JSON):
+  {
+    "email"    : "string — required",
+    "password" : "string — required"
+  }
+
+Success 200:
+  Sets-Cookie: token=<jwt>; HttpOnly; ...
+  {
+    "message": "Logged in",
+    "user": {
+      "id"   : "<ObjectId>",
+      "email": "user@example.com",
+      "role" : "STUDENT"
+    }
+  }
+
+Errors:
+  400  { "message": "Invalid credentials" }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/auth/me
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+
+Request body : none
+
+Success 200:
+  {
+    "user": {
+      "_id"      : "<ObjectId>",
+      "email"    : "user@example.com",
+      "role"     : "STUDENT",
+      "createdAt": "ISO date",
+      "updatedAt": "ISO date"
+    }
+  }
+
+Errors:
+  401  { "message": "Not authorized" }
+  404  { "message": "User not found" }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/auth/logout
+────────────────────────────────────────────────────────────────────────────────
+Middleware : none
+Roles      : public (cookie cleared regardless)
+
+Request body : none
+
+Success 200:
+  Clears-Cookie: token
+  {
+    "message": "Logged out"
+  }
+
+
+================================================================================
+  2. PROFILE  —  /api/profile
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/profile
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only
+Note       : Can only be called once per user. Also auto-creates YEAR and
+             YEAR_SECTION academic groups and enrols the student in both.
+
+Request body (JSON):
+  {
+    "branch"       : "string  — required (e.g. 'CSE')",
+    "year"         : "number  — required, 1–4",
+    "section"      : "string  — required, single uppercase letter (e.g. 'A')",
+    "rollNumber"   : "string  — required",
+    "skills"       : ["string", ...]   — optional, default []",
+    "interests"    : ["string", ...]   — optional, default []",
+    "resumeLink"   : "string  — optional, must be a valid google drive URL",
+    "portfolioLink": "string  — optional, must be a valid google drive URL"
+  }
+
+Success 201:
+  {
+    "message": "Profile created",
+    "profile": {
+      "_id"          : "<ObjectId>",
+      "userId"       : "<ObjectId>",
+      "branch"       : "CSE",
+      "year"         : 2,
+      "section"      : "A",
+      "rollNumber"   : "22CSE001",
+      "skills"       : ["JavaScript", "Node.js"],
+      "interests"    : ["Web Dev"],
+      "resumeLink"   : "https://drive.google.com/...",
+      "portfolioLink": "https://drive.google.com/...",
+      "isActive"     : true,
+      "createdAt"    : "ISO date",
+      "updatedAt"    : "ISO date"
+    }
+  }
+
+Errors:
+  400  { "message": "Profile already exists" }
+  400  { "error": "<ValidationError details>" }
+  401  Not authorized / Token invalid
+  403  Access denied (non-STUDENT)
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/profile/me
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only
+
+Request body : none
+
+Success 200:
+  {
+    "profile": {
+      "_id"          : "<ObjectId>",
+      "userId"       : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+      "branch"       : "CSE",
+      "year"         : 2,
+      "section"      : "A",
+      "rollNumber"   : "22CSE001",
+      "skills"       : ["JavaScript"],
+      "interests"    : ["Web Dev"],
+      "resumeLink"   : null,
+      "portfolioLink": null,
+      "isActive"     : true,
+      "createdAt"    : "ISO date",
+      "updatedAt"    : "ISO date"
+    }
+  }
+
+Errors:
+  404  { "message": "Profile not found. Please create one." }
+  401 / 403  (middleware)
+
+────────────────────────────────────────────────────────────────────────────────
+PUT /api/profile
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only
+Note       : Only the authenticated student's own profile is updated.
+             Allowed fields: branch, year, section, rollNumber,
+                             skills, interests, resumeLink, portfolioLink
+
+Request body (JSON) — send only the fields you want to change:
+  {
+    "branch"       : "string  — optional",
+    "year"         : "number  — optional, 1–4",
+    "section"      : "string  — optional, single uppercase letter",
+    "rollNumber"   : "string  — optional",
+    "skills"       : ["string", ...]  — optional",
+    "interests"    : ["string", ...]  — optional",
+    "resumeLink"   : "string  — optional, google drive URL",
+    "portfolioLink": "string  — optional, google drive URL"
+  }
+
+Success 200:
+  {
+    "message": "Profile updated",
+    "profile": { ...same shape as POST /api/profile response }
+  }
+
+Errors:
+  400  { "error": "<ValidationError details>" }
+  404  { "message": "Profile not found" }
+  401 / 403  (middleware)
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/profile/filter
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("FACULTY", "ADMIN")  (requires cookie: token)
+Roles      : FACULTY | ADMIN
+
+Query params (all optional):
+  year    — number  (e.g. ?year=2)
+  section — string  (e.g. ?section=A)
+  branch  — string, case-insensitive regex  (e.g. ?branch=cse)
+
+Success 200:
+  {
+    "count": 30,
+    "profiles": [
+      {
+        "_id"          : "<ObjectId>",
+        "userId"       : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+        "branch"       : "CSE",
+        "year"         : 2,
+        "section"      : "A",
+        "rollNumber"   : "22CSE001",
+        "skills"       : [...],
+        "interests"    : [...],
+        "resumeLink"   : null,
+        "portfolioLink": null,
+        "isActive"     : true
+      },
+      ...
+    ]
+  }
+
+Errors:
+  401 / 403  (middleware)
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/profile/view/:id
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("FACULTY", "ADMIN")  (requires cookie: token)
+Roles      : FACULTY | ADMIN
+
+Path param:
+  id — StudentProfile ObjectId
+
+Success 200:
+  {
+    "profile": { ...full profile object with populated userId }
+  }
+
+Errors:
+  404  { "message": "Profile not found" }
+  401 / 403  (middleware)
+
+
+================================================================================
+  3. GROUPS  —  /api/groups
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/groups/my
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only
+
+Request body : none
+
+Success 200:
+  {
+    "groups": [
+      {
+        "_id"        : "<ObjectId>",
+        "name"       : "CSE-2",
+        "type"       : "YEAR",
+        "branch"     : "CSE",
+        "year"       : 2,
+        "section"    : null,
+        "isActive"   : true,
+        "socketRoom" : "<ObjectId>  — use for socket.emit('joinGroup', { groupId })"
+      },
+      {
+        "_id"        : "<ObjectId>",
+        "name"       : "CSE-2-A",
+        "type"       : "YEAR_SECTION",
+        "branch"     : "CSE",
+        "year"       : 2,
+        "section"    : "A",
+        "isActive"   : true,
+        "socketRoom" : "<ObjectId>"
+      }
+    ]
+  }
+
+Errors:
+  404  { "message": "No groups found. Create a profile first." }
+  401 / 403  (middleware)
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/groups
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("ADMIN", "FACULTY")  (requires cookie: token)
+Roles      : ADMIN | FACULTY
+
+Query params (all optional):
+  branch  — string, uppercase (e.g. ?branch=CSE)
+  year    — number  (e.g. ?year=2)
+  section — string, uppercase (e.g. ?section=A)
+  type    — string, YEAR | YEAR_SECTION
+
+Success 200:
+  {
+    "count": 6,
+    "groups": [
+      {
+        "_id"     : "<ObjectId>",
+        "name"    : "CSE-2-A",
+        "branch"  : "CSE",
+        "year"    : 2,
+        "section" : "A",
+        "type"    : "YEAR_SECTION",
+        "isActive": true,
+        "createdAt": "ISO date",
+        "updatedAt": "ISO date"
+      },
+      ...
+    ]
+  }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/groups/:groupId/members
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("ADMIN", "FACULTY")  (requires cookie: token)
+Roles      : ADMIN | FACULTY
+
+Path param:
+  groupId — AcademicGroup ObjectId
+
+Success 200:
+  {
+    "groupName": "CSE-2-A",
+    "count": 60,
+    "members": [
+      {
+        "_id"          : "<ObjectId>",
+        "userId"       : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+        "branch"       : "CSE",
+        "year"         : 2,
+        "section"      : "A",
+        "rollNumber"   : "22CSE001",
+        "skills"       : [...],
+        "interests"    : [...],
+        "isActive"     : true
+      },
+      ...
+    ]
+  }
+
+Errors:
+  404  { "message": "Group not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/groups/:groupId/open
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
+             (requires cookie: token)
+Roles      : STUDENT | FACULTY | ADMIN
+             Students are only allowed if they are a member of the group.
+
+Path param:
+  groupId — AcademicGroup ObjectId
+
+Success 200:
+  {
+    "group": {
+      "_id"        : "<ObjectId>",
+      "name"       : "CSE-2-A",
+      "type"       : "YEAR_SECTION",
+      "branch"     : "CSE",
+      "year"       : 2,
+      "section"    : "A",
+      "isActive"   : true,
+      "socketRoom" : "<ObjectId>"
+    }
+  }
+
+Errors:
+  403  { "message": "You are not a member of this group" }
+  404  { "message": "Group not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/groups/:groupId/chat
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only; must be a member of the group
+
+Path param:
+  groupId — AcademicGroup ObjectId
+
+Request body (JSON):
+  {
+    "message": "string — required, non-empty"
+  }
+
+Success 201:
+  {
+    "message": "Message sent",
+    "data": {
+      "_id"      : "<ObjectId>",
+      "groupId"  : "<ObjectId>",
+      "sender"   : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+      "message"  : "Hello group!",
+      "isEdited" : false,
+      "createdAt": "ISO date",
+      "updatedAt": "ISO date"
+    }
+  }
+
+Errors:
+  400  { "message": "Message cannot be empty" }
+  403  { "message": "You are not a member of this group" }
+  404  { "message": "Group not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/groups/:groupId/chat
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
+             (requires cookie: token)
+Roles      : STUDENT (must be member) | FACULTY | ADMIN
+
+Path param:
+  groupId — AcademicGroup ObjectId
+
+Query params (optional):
+  page  — number, default 1
+  limit — number, default 50, max 100
+
+Success 200:
+  {
+    "total": 250,
+    "page" : 2,
+    "limit": 50,
+    "messages": [
+      {
+        "_id"      : "<ObjectId>",
+        "groupId"  : "<ObjectId>",
+        "sender"   : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+        "message"  : "Hello!",
+        "isEdited" : false,
+        "createdAt": "ISO date",
+        "updatedAt": "ISO date"
+      },
+      ...
+    ]
+  }
+
+Errors:
+  403  { "message": "You are not a member of this group" }
+  404  { "message": "Group not found" }
+
+
+================================================================================
+  4. CHAT  —  /api/chat  (edit / delete own messages)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+PUT /api/chat/:messageId
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only; must be the original sender of the message
+
+Path param:
+  messageId — GroupChatMessage ObjectId
+
+Request body (JSON):
+  {
+    "message": "string — required, non-empty, new text"
+  }
+
+Success 200:
+  {
+    "message": "Message updated",
+    "data": {
+      "_id"      : "<ObjectId>",
+      "groupId"  : "<ObjectId>",
+      "sender"   : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+      "message"  : "Edited text",
+      "isEdited" : true,
+      "createdAt": "ISO date",
+      "updatedAt": "ISO date"
+    }
+  }
+
+Errors:
+  400  { "message": "Message cannot be empty" }
+  403  { "message": "You can only edit your own messages" }
+  404  { "message": "Message not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+DELETE /api/chat/:messageId
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only; must be the original sender of the message
+
+Path param:
+  messageId — GroupChatMessage ObjectId
+
+Success 200:
+  {
+    "message": "Message deleted"
+  }
+
+Errors:
+  403  { "message": "You can only delete your own messages" }
+  404  { "message": "Message not found" }
+
+
+================================================================================
+  5. THREADS  —  /api/threads
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/threads/:groupId
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only; must be a member of the group
+
+Path param:
+  groupId — AcademicGroup ObjectId
+
+Request body (JSON):
+  {
+    "title"  : "string — required",
+    "content": "string — required",
+    "subject": "string — optional, default 'General'"
+  }
+
+Success 201:
+  {
+    "message": "Thread created",
+    "thread": {
+      "_id"       : "<ObjectId>",
+      "groupId"   : "<ObjectId>",
+      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+      "title"     : "How to solve this problem?",
+      "content"   : "Detailed description...",
+      "subject"   : "Mathematics",
+      "isResolved": false,
+      "resolvedBy": null,
+      "createdAt" : "ISO date",
+      "updatedAt" : "ISO date"
+    }
+  }
+
+Errors:
+  400  { "message": "Title and content are required" }
+  403  { "message": "You are not a member of this group" }
+  404  { "message": "Group not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/threads/:groupId
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
+             (requires cookie: token)
+Roles      : STUDENT | FACULTY | ADMIN; must be a member of the group
+
+Path param:
+  groupId — AcademicGroup ObjectId
+
+Query params (optional):
+  subject  — string, case-insensitive partial match
+  resolved — boolean string: "true" | "false"
+  page     — number, default 1
+  limit    — number, default 20, max 100
+
+Success 200:
+  {
+    "total"  : 45,
+    "page"   : 1,
+    "limit"  : 20,
+    "threads": [
+      {
+        "_id"       : "<ObjectId>",
+        "groupId"   : "<ObjectId>",
+        "author"    : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+        "title"     : "Help with OS assignment",
+        "content"   : "...",
+        "subject"   : "Operating Systems",
+        "isResolved": false,
+        "resolvedBy": null,
+        "createdAt" : "ISO date",
+        "updatedAt" : "ISO date"
+      },
+      ...
+    ]
+  }
+
+Errors:
+  403  { "message": "You are not a member of this group" }
+  404  { "message": "Group not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/threads/thread/:threadId
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
+             (requires cookie: token)
+Roles      : STUDENT | FACULTY | ADMIN; must be a member of the thread's group
+
+Path param:
+  threadId — DiscussionThread ObjectId
+
+Success 200:
+  {
+    "thread": {
+      "_id"       : "<ObjectId>",
+      "groupId"   : "<ObjectId>",
+      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+      "title"     : "Help with OS assignment",
+      "content"   : "Full content...",
+      "subject"   : "Operating Systems",
+      "isResolved": true,
+      "resolvedBy": { "_id": "<ObjectId>", "email": "...", "role": "FACULTY" },
+      "createdAt" : "ISO date",
+      "updatedAt" : "ISO date"
+    },
+    "replies": [
+      {
+        "_id"       : "<ObjectId>",
+        "threadId"  : "<ObjectId>",
+        "author"    : { "_id": "<ObjectId>", "email": "...", "role": "FACULTY" },
+        "content"   : "Here is the answer...",
+        "isAccepted": true,
+        "createdAt" : "ISO date",
+        "updatedAt" : "ISO date"
+      },
+      ...
+    ]
+  }
+
+Errors:
+  403  { "message": "You are not a member of this group" }
+  404  { "message": "Thread not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/threads/thread/:threadId/reply
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
+             (requires cookie: token)
+Roles      : STUDENT | FACULTY | ADMIN; must be a member of the thread's group
+
+Path param:
+  threadId — DiscussionThread ObjectId
+
+Request body (JSON):
+  {
+    "content": "string — required, non-empty"
+  }
+
+Success 201:
+  {
+    "message": "Reply added",
+    "reply": {
+      "_id"       : "<ObjectId>",
+      "threadId"  : "<ObjectId>",
+      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "FACULTY" },
+      "content"   : "Here is the solution...",
+      "isAccepted": false,
+      "createdAt" : "ISO date",
+      "updatedAt" : "ISO date"
+    }
+  }
+
+Errors:
+  400  { "message": "Reply content is required" }
+  403  { "message": "You are not a member of this group" }
+  404  { "message": "Thread not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+PUT /api/threads/thread/:threadId/resolve
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
+             (requires cookie: token)
+Roles      : Thread author OR FACULTY OR ADMIN (enforced in controller)
+
+Path param:
+  threadId — DiscussionThread ObjectId
+
+Request body : none
+
+Success 200:
+  {
+    "message": "Thread marked as resolved",
+    "thread": {
+      "_id"       : "<ObjectId>",
+      "groupId"   : "<ObjectId>",
+      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+      "title"     : "Help with OS assignment",
+      "content"   : "...",
+      "subject"   : "Operating Systems",
+      "isResolved": true,
+      "resolvedBy": { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+      "createdAt" : "ISO date",
+      "updatedAt" : "ISO date"
+    }
+  }
+
+Errors:
+  403  { "message": "Only the thread author or faculty/admin can resolve this" }
+  404  { "message": "Thread not found" }
+
+────────────────────────────────────────────────────────────────────────────────
+PUT /api/threads/reply/:replyId/accept
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only; must be the thread author (enforced in controller)
+Note       : Accepting a reply automatically un-accepts any previously accepted
+             reply within the same thread (only one accepted reply per thread).
+
+Path param:
+  replyId — DiscussionReply ObjectId
+
+Request body : none
+
+Success 200:
+  {
+    "message": "Reply accepted",
+    "reply": {
+      "_id"       : "<ObjectId>",
+      "threadId"  : "<ObjectId>",
+      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "FACULTY" },
+      "content"   : "Here is the solution...",
+      "isAccepted": true,
+      "createdAt" : "ISO date",
+      "updatedAt" : "ISO date"
+    }
+  }
+
+Errors:
+  403  { "message": "Only the thread author can accept a reply" }
+  404  { "message": "Reply not found" }
+  404  { "message": "Thread not found" }
+
+
+================================================================================
+  6. SOCKET.IO EVENTS  —  ws://localhost:5000
+================================================================================
+
+Connection requires credentials: true (the same cookie is forwarded).
+
+Client → Server events:
+  joinGroup   { groupId: "<ObjectId>" }   — join a group's Socket.IO room
+  leaveGroup  { groupId: "<ObjectId>" }   — leave a group's Socket.IO room
+  sendMessage { groupId: "<ObjectId>", message: "string" }
+
+Server → Client events:
+  newMessage  — emitted to all members of the room on a new chat message
+    {
+      "_id"      : "<ObjectId>",
+      "groupId"  : "<ObjectId>",
+      "sender"   : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
+      "message"  : "Hello!",
+      "isEdited" : false,
+      "createdAt": "ISO date",
+      "updatedAt": "ISO date"
+    }
+
+Note: The socketRoom value returned by GET /api/groups/my and
+      GET /api/groups/:groupId/open is identical to the groupId used here.
+
+
+================================================================================
+  ROLE SUMMARY
+================================================================================
+
+  Endpoint                                     STUDENT   FACULTY   ADMIN
+  ─────────────────────────────────────────────────────────────────────────
+  POST   /api/auth/register                      ✓         ✓         ✓
+  POST   /api/auth/login                         ✓         ✓         ✓
+  GET    /api/auth/me                            ✓         ✓         ✓
+  POST   /api/auth/logout                        ✓         ✓         ✓
+  POST   /api/profile                            ✓
+  GET    /api/profile/me                         ✓
+  PUT    /api/profile                            ✓
+  GET    /api/profile/filter                               ✓         ✓
+  GET    /api/profile/view/:id                             ✓         ✓
+  GET    /api/groups/my                          ✓
+  GET    /api/groups                                       ✓         ✓
+  GET    /api/groups/:groupId/members                      ✓         ✓
+  GET    /api/groups/:groupId/open               ✓         ✓         ✓
+  POST   /api/groups/:groupId/chat               ✓
+  GET    /api/groups/:groupId/chat               ✓         ✓         ✓
+  PUT    /api/chat/:messageId                    ✓
+  DELETE /api/chat/:messageId                    ✓
+  POST   /api/threads/:groupId                   ✓
+  GET    /api/threads/:groupId                   ✓         ✓         ✓
+  GET    /api/threads/thread/:threadId           ✓         ✓         ✓
+  POST   /api/threads/thread/:threadId/reply     ✓         ✓         ✓
+  PUT    /api/threads/thread/:threadId/resolve   ✓*        ✓         ✓
+  PUT    /api/threads/reply/:replyId/accept      ✓*
+  ─────────────────────────────────────────────────────────────────────────
+  * STUDENT role with additional ownership enforced in controller:
+    resolve  — only thread author
+    accept   — only thread author
+
+================================================================================
