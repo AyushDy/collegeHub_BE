@@ -1,0 +1,152 @@
+# Backend Progress Log
+# Project: College Students Community Hub
+# Last Updated: Feb 23, 2026 (Phase 3)
+
+===========================================
+✅ COMPLETED
+===========================================
+
+[INFRASTRUCTURE]
+- Express server setup (server.js)
+- MongoDB connection via Mongoose (src/config/db.js)
+- Environment variables via dotenv (.env)
+- cookie-parser middleware added
+- CORS configured with credentials support
+- Socket.IO server initialized (attached to http.Server)
+- cookie package added for socket JWT auth
+
+[AUTH MODULE]
+- User model (src/models/User.js)
+  - Fields: email, password, role (ADMIN | FACULTY | STUDENT)
+  - Timestamps enabled
+- Auth controller (src/controllers/authController.js)
+  - POST /api/auth/register  → creates user, bcrypt hash, auto-login via cookie
+  - POST /api/auth/login     → validates credentials, sets JWT cookie
+  - GET  /api/auth/me        → returns current user from cookie (session restore)
+  - POST /api/auth/logout    → clears cookie
+- JWT middleware (src/middleware/authMiddleware.js)
+  - protect     → verifies JWT from httpOnly cookie
+  - authorize   → role-based access guard
+- Auth routes (src/routes/authRoutes.js)
+
+[STUDENT PROFILE MODULE]
+- StudentProfile model (src/models/StudentProfile.js)
+  - Fields: userId, branch, year, section, rollNumber, skills, interests,
+            resumeLink, portfolioLink, isActive
+  - Validation: year (1–4), section (single uppercase letter),
+                resumeLink/portfolioLink (Google Drive URL regex)
+  - Indexes: unique(userId), compound(year+section), branch
+- Profile controller (src/controllers/profileController.js)
+  - POST /api/profile              → create profile (STUDENT, once) + auto-creates AcademicGroup
+  - GET  /api/profile/me           → own profile (STUDENT)
+  - PUT  /api/profile              → update own profile (STUDENT)
+  - GET  /api/profile/view/:id     → view any profile (FACULTY, ADMIN)
+  - GET  /api/profile/filter       → filter by year/section/branch (FACULTY, ADMIN)
+- Profile routes (src/routes/profileRoutes.js)
+
+[ACADEMIC GROUP SYSTEM]
+- AcademicGroup model (src/models/AcademicGroup.js)
+  - Fields: branch, year, section, name (e.g. CSE-2-A), isActive
+  - Auto-created on StudentProfile creation via upsert (no duplicates)
+  - Members resolved dynamically via StudentProfile (not stored in group)
+- Group controller (src/controllers/groupController.js)
+  - GET  /api/groups/my                    → student's own group (STUDENT)
+  - GET  /api/groups                       → list all groups, filterable (ADMIN, FACULTY)
+  - GET  /api/groups/:groupId/members      → dynamic member list (ADMIN, FACULTY)
+- Group routes (src/routes/groupRoutes.js)
+
+[GROUP CHAT SYSTEM — REST]
+- GroupChatMessage model (src/models/GroupChatMessage.js)
+  - Fields: groupId, sender, message, isEdited, timestamps
+- REST chat endpoints (via groupController + chatController)
+  - POST   /api/groups/:groupId/chat  → send message (STUDENT, member only)
+  - GET    /api/groups/:groupId/chat  → paginated messages (STUDENT/FACULTY/ADMIN)
+  - PUT    /api/chat/:messageId       → edit own message (STUDENT)
+  - DELETE /api/chat/:messageId       → delete own message (STUDENT)
+- Chat routes (src/routes/chatRoutes.js)
+
+[GROUP CHAT SYSTEM — SOCKET.IO REALTIME]
+- Socket handler (src/socket/index.js)
+  - JWT auth via httpOnly cookie on handshake
+  - joinGroup      → verify membership, join socket room
+  - sendMessage    → validate, save to DB, emit receiveMessage to room
+  - editMessage    → validate ownership, update DB, emit messageEdited
+  - deleteMessage  → validate ownership, delete from DB, emit messageDeleted
+  - Both REST and Socket share same GroupChatMessage model
+
+===========================================
+🔲 PENDING / PLANNED
+===========================================
+
+[STUDENT COMMUNITY SYSTEM]
+✅ Discussion forums (year/section/subject scoped)
+✅ Doubt-solving threads (post, reply, mark resolved, accept reply)
+
+[SHARED UTILITIES]
+- src/utils/groupMembership.js
+  - getStudentGroup() — resolves student's AcademicGroup from profile
+  - isMember()       — FACULTY/ADMIN bypass, students checked by group
+  - Used by: groupController, threadController, socket handler
+
+[DISCUSSION & DOUBT THREAD SYSTEM]
+- DiscussionThread model (src/models/DiscussionThread.js)
+  - Fields: groupId, author, title, content, subject, isResolved, resolvedBy
+  - Timestamps enabled
+- DiscussionReply model (src/models/DiscussionReply.js)
+  - Fields: threadId, author, content, isAccepted
+  - Timestamps enabled
+- Thread controller (src/controllers/threadController.js)
+  - POST /api/threads/:groupId            → create thread (STUDENT, member only)
+  - GET  /api/threads/:groupId            → list threads, filter by subject/resolved (all roles, member)
+  - GET  /api/threads/thread/:threadId    → thread + all replies (all roles, member)
+  - POST /api/threads/thread/:id/reply    → reply to thread (all roles, member)
+  - PUT  /api/threads/thread/:id/resolve  → mark resolved (author or FACULTY/ADMIN)
+  - PUT  /api/threads/reply/:id/accept    → accept reply (thread author only)
+- Thread routes (src/routes/threadRoutes.js)
+- Thread Socket.IO events (src/socket/index.js)
+  - createThread    → STUDENT + member check; saves thread; emits newThread to groupId room
+  - replyToThread   → all roles + member check; saves reply; emits newReply { threadId, reply }
+  - resolveThread   → author/FACULTY/ADMIN + member check; emits threadResolved { threadId, resolvedBy }
+  - acceptReply     → thread author (STUDENT) only; emits replyAccepted { replyId, threadId }
+  - Reuses existing joinGroup rooms (no new room events needed)
+  - isMember() imported from groupMembership utils (FACULTY/ADMIN bypass preserved)
+
+[ACADEMIC RESOURCE HUB]
+[ ] Syllabus database (branch + year + subject indexed)
+[ ] Previous Year Questions (PYQ) repository
+[ ] Subject-wise file upload system
+[ ] Search and filter across resources
+
+[AI INTEGRATION]
+[ ] AI-powered study roadmap generator
+[ ] Personalized study plan builder
+[ ] Smart doubt assistance (AI reply suggestions)
+[ ] AI-based content/resource recommendations
+[ ] Performance-based study suggestions
+
+[QUIZ & ASSESSMENT SYSTEM]
+[ ] Post-lecture quiz creation (faculty)
+[ ] Subject-wise assessments
+[ ] Automated evaluation and scoring
+[ ] Score history and tracking per student
+[ ] Performance analytics charts
+
+[CLUBS & EVENTS MANAGEMENT]
+[ ] Club listing with descriptions
+[ ] Event announcements and details
+[ ] Event registration system
+[ ] Participation history tracking per student
+[ ] Activity calendar view
+
+[NOTIFICATIONS & UPDATES]
+[ ] Academic announcements (admin/faculty broadcast)
+[ ] Exam alerts and deadline reminders
+[ ] Event reminders
+[ ] In-app notification feed
+
+[INFRASTRUCTURE & SCALABILITY]
+[ ] CSV bulk import for student onboarding
+[ ] Analytics module (engagement, performance, activity)
+[ ] Rate limiting and request throttling
+[ ] Frontend integration
+[ ] API documentation (Swagger / Postman collection)
