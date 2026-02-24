@@ -110,8 +110,11 @@ exports.getReplies = async (req, res) => {
 
     const uid = req.user.userId;
 
+    // Only fetch top-level replies (parentReplyId is null)
+    const topLevelFilter = { forumId: req.params.forumId, parentReplyId: null };
+
     const [replies, total] = await Promise.all([
-      ForumReply.find({ forumId: req.params.forumId })
+      ForumReply.find(topLevelFilter)
         .populate("author", "name email role")
         .sort({ createdAt: 1 })
         .skip(skip)
@@ -128,7 +131,7 @@ exports.getReplies = async (req, res) => {
             dislikes: undefined,
           }))
         ),
-      ForumReply.countDocuments({ forumId: req.params.forumId }),
+      ForumReply.countDocuments(topLevelFilter),
     ]);
 
     res.json({
@@ -144,6 +147,53 @@ exports.getReplies = async (req, res) => {
   }
 };
 
+// ─── GET /api/forums/replies/:replyId/children ──────────────────────────────
+// Fetch child replies for a given parent reply (paginated)
+exports.getChildReplies = async (req, res) => {
+  try {
+    const parent = await ForumReply.findById(req.params.replyId);
+    if (!parent) return res.status(404).json({ message: "Reply not found" });
+
+    const { page = 1, limit = 50 } = req.query;
+    const skip = (Math.max(Number(page), 1) - 1) * Math.min(Number(limit), 100);
+    const lim = Math.min(Number(limit) || 50, 100);
+
+    const uid = req.user.userId;
+
+    const [children, total] = await Promise.all([
+      ForumReply.find({ parentReplyId: req.params.replyId })
+        .populate("author", "name email role")
+        .sort({ createdAt: 1 })
+        .skip(skip)
+        .limit(lim)
+        .lean()
+        .then((docs) =>
+          docs.map((r) => ({
+            ...r,
+            likesCount: r.likes?.length || 0,
+            dislikesCount: r.dislikes?.length || 0,
+            userLiked: r.likes?.some((id) => id.toString() === uid) || false,
+            userDisliked: r.dislikes?.some((id) => id.toString() === uid) || false,
+            likes: undefined,
+            dislikes: undefined,
+          }))
+        ),
+      ForumReply.countDocuments({ parentReplyId: req.params.replyId }),
+    ]);
+
+    res.json({
+      children,
+      page: Math.max(Number(page), 1),
+      pages: Math.ceil(total / lim) || 1,
+      total,
+    });
+  } catch (err) {
+    if (err.name === "CastError")
+      return res.status(400).json({ message: "Invalid replyId" });
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
 // ─── POST /api/forums/:forumId/replies ───────────────────────────────────────
 exports.addReply = async (req, res) => {
   try {
@@ -151,15 +201,28 @@ exports.addReply = async (req, res) => {
     if (!forum || !forum.isActive)
       return res.status(404).json({ message: "Forum not found" });
 
-    const { content } = req.body;
+    const { content, parentReplyId } = req.body;
     if (!content || !content.trim())
       return res.status(400).json({ message: "Content is required" });
+
+    // Validate parent reply if provided
+    if (parentReplyId) {
+      const parentReply = await ForumReply.findById(parentReplyId);
+      if (!parentReply || parentReply.forumId.toString() !== req.params.forumId)
+        return res.status(400).json({ message: "Invalid parent reply" });
+    }
 
     const reply = await ForumReply.create({
       forumId: req.params.forumId,
       author: req.user.userId,
       content: content.trim(),
+      parentReplyId: parentReplyId || null,
     });
+
+    // Increment child count on parent reply
+    if (parentReplyId) {
+      await ForumReply.findByIdAndUpdate(parentReplyId, { $inc: { childCount: 1 } });
+    }
 
     forum.replyCount += 1;
     forum.lastActivity = new Date();
@@ -220,8 +283,20 @@ exports.deleteReply = async (req, res) => {
       return res.status(403).json({ message: "Not allowed" });
 
     const forumId = reply.forumId;
+    const parentId = reply.parentReplyId;
+
+    // Delete child replies as well
+    const childCount = await ForumReply.countDocuments({ parentReplyId: reply._id });
+    await ForumReply.deleteMany({ parentReplyId: reply._id });
     await reply.deleteOne();
-    await ForumThread.findByIdAndUpdate(forumId, { $inc: { replyCount: -1 } });
+
+    // Decrement total replyCount by 1 (this reply) + its children
+    await ForumThread.findByIdAndUpdate(forumId, { $inc: { replyCount: -(1 + childCount) } });
+
+    // Decrement parent's childCount if this was a nested reply
+    if (parentId) {
+      await ForumReply.findByIdAndUpdate(parentId, { $inc: { childCount: -1 } });
+    }
 
     res.json({ message: "Reply deleted" });
   } catch (err) {
@@ -350,6 +425,42 @@ exports.dislikeReply = async (req, res) => {
   } catch (err) {
     if (err.name === "CastError")
       return res.status(400).json({ message: "Invalid replyId" });
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// ─── PUT /api/forums/:forumId ────────────────────────────────────────────────
+exports.editForum = async (req, res) => {
+  try {
+    const forum = await ForumThread.findById(req.params.forumId);
+    if (!forum || !forum.isActive)
+      return res.status(404).json({ message: "Forum not found" });
+
+    if (forum.createdBy.toString() !== req.user.userId)
+      return res.status(403).json({ message: "You can only edit your own forums" });
+
+    const { title, description, topic, tags } = req.body;
+
+    if (title !== undefined) {
+      if (!title.trim()) return res.status(400).json({ message: "Title cannot be empty" });
+      forum.title = title.trim();
+    }
+    if (description !== undefined) forum.description = description.trim();
+    if (topic !== undefined) forum.topic = topic.trim() || "General";
+    if (tags !== undefined) {
+      forum.tags = (Array.isArray(tags) ? tags : tags.split(","))
+        .map((t) => t.trim())
+        .filter(Boolean);
+    }
+
+    forum.isEdited = true;
+    await forum.save();
+
+    const populated = await forum.populate("createdBy", "name email role");
+    res.json(populated);
+  } catch (err) {
+    if (err.name === "CastError")
+      return res.status(400).json({ message: "Invalid forumId" });
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };

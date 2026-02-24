@@ -7,11 +7,13 @@ const fc = require("../controllers/forumController");
 router.post("/", protect, fc.createForum);
 router.get("/", protect, fc.listForums);
 router.get("/:forumId", protect, fc.getForum);
+router.put("/:forumId", protect, fc.editForum);
 router.delete("/:forumId", protect, fc.deleteForum);
 
 // Replies
 router.get("/:forumId/replies", protect, fc.getReplies);
 router.post("/:forumId/replies", protect, fc.addReply);
+router.get("/replies/:replyId/children", protect, fc.getChildReplies);
 router.put("/replies/:replyId", protect, fc.editReply);
 router.delete("/replies/:replyId", protect, fc.deleteReply);
 
