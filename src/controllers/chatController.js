@@ -1,4 +1,25 @@
 const GroupChatMessage = require("../models/GroupChatMessage");
+const { isMember } = require("../utils/groupMembership");
+
+// POST /api/chat/upload-image — upload image for chat, returns imageUrl
+exports.uploadImage = async (req, res) => {
+  try {
+    if (!req.file)
+      return res.status(400).json({ message: "Image file is required" });
+
+    const { groupId } = req.body;
+    if (!groupId)
+      return res.status(400).json({ message: "groupId is required" });
+
+    const member = await isMember(req.user.userId, req.user.role, groupId);
+    if (!member)
+      return res.status(403).json({ message: "You are not a member of this group" });
+
+    res.json({ imageUrl: req.file.path });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
 
 // PUT /api/chat/:messageId — edit own message
 exports.editMessage = async (req, res) => {

@@ -63,22 +63,23 @@ module.exports = (io) => {
     });
 
     // ── sendMessage ───────────────────────────────────────────────────────────
-    socket.on("sendMessage", async ({ groupId, message }) => {
+    socket.on("sendMessage", async ({ groupId, message, image }) => {
       try {
         const member = await isMember(socket.user.userId, socket.user.role, groupId);
         if (!member)
           return socket.emit("error", { message: "You are not a member of this group" });
 
-        if (!message || !message.trim())
-          return socket.emit("error", { message: "Message cannot be empty" });
+        if ((!message || !message.trim()) && !image)
+          return socket.emit("error", { message: "Message or image is required" });
 
         const newMsg = await GroupChatMessage.create({
           groupId,
           sender: socket.user.userId,
-          message: message.trim(),
+          message: message?.trim() || null,
+          image: image || null,
         });
 
-        const populated = await newMsg.populate("sender", "email role");
+        const populated = await newMsg.populate("sender", "email role name profilePicture");
 
         // Broadcast to everyone in the room including sender
         io.to(groupId).emit("receiveMessage", populated);

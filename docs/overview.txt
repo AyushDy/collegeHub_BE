@@ -34,6 +34,7 @@ Errors:
   notifications.txt  — /api/notifications
   resources.txt      — /api/resources
   forums.txt         — /api/forums
+  events.txt         — /api/events
   socket.txt         — Socket.IO events (groups, threads, quiz)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -101,8 +102,18 @@ Errors:
   PATCH  /api/forums/:forumId/dislike            ✓     ✓     ✓
   PATCH  /api/forums/replies/:replyId/like       ✓     ✓     ✓
   PATCH  /api/forums/replies/:replyId/dislike    ✓     ✓     ✓
+  PATCH  /api/auth/profile-picture               ✓     ✓     ✓
+  DELETE /api/auth/profile-picture               ✓     ✓     ✓
+  POST   /api/chat/upload-image                  ✓     ✓     ✓
+  POST   /api/events                                   ✓     ✓
+  GET    /api/events                             ✓     ✓     ✓
+  GET    /api/events/:eventId                    ✓     ✓     ✓
+  PATCH  /api/events/:eventId                          ✓*    ✓
+  PATCH  /api/events/:eventId/rsvp               ✓     ✓     ✓
+  DELETE /api/events/:eventId                          ✓*    ✓
   ─────────────────────────────────────────────────────────
   * ownership enforced in controller (thread author only)
   * /api/quiz/:quizId/start — creator (any role), FACULTY, or ADMIN
   * DELETE /api/resources/:resourceId — uploader, FACULTY, or ADMIN
   * DELETE /api/forums/:forumId — creator, FACULTY, or ADMIN
+  * PATCH/DELETE /api/events/:eventId — organizer or ADMIN

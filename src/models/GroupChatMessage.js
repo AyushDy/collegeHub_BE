@@ -14,8 +14,12 @@ const groupChatMessageSchema = new mongoose.Schema(
     },
     message: {
       type: String,
-      required: [true, "Message cannot be empty"],
       trim: true,
+      default: null,
+    },
+    image: {
+      type: String,
+      default: null,
     },
     isEdited: {
       type: Boolean,

@@ -1,0 +1,65 @@
+EVENTS  —  /api/events
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+POST /api/events                           [FACULTY | ADMIN]
+  Content-Type: multipart/form-data
+  Fields:
+    title*       : String (max 200)
+    date*        : ISO date string
+    description  : String (max 3000)
+    time         : String (e.g. "10:00 AM - 2:00 PM")
+    venue        : String (max 200)
+    type         : "COLLEGE" (default) | "GROUP" | "CLUB"
+    groupId      : ObjectId — required when type = GROUP
+    tags         : String[] (array of tag strings)
+    poster       : Image file (jpg/png/webp, max 5 MB)
+  201 : { message, event }
+  400 : "Title and date are required"
+  400 : "Invalid event type"
+  400 : "groupId is required for GROUP events"
+  404 : "Group not found"
+
+GET /api/events                            [ALL AUTHENTICATED]
+  Query:
+    page     : Number (default 1)
+    limit    : Number (default 20, max 100)
+    type     : "COLLEGE" | "GROUP" | "CLUB"
+    groupId  : ObjectId — filter by group
+    upcoming : "true" — only events with date >= now
+    search   : text search on title + tags
+  200 : { page, limit, totalPages, totalEvents, events[] }
+  Each event includes: rsvpCount, userRsvpd (boolean)
+
+GET /api/events/:eventId                   [ALL AUTHENTICATED]
+  200 : { event } — includes rsvps[] populated, rsvpCount, userRsvpd
+  404 : "Event not found"
+
+PATCH /api/events/:eventId                 [FACULTY | ADMIN — organizer or ADMIN]
+  Content-Type: multipart/form-data
+  Fields (all optional):
+    title, description, date, time, venue, type, groupId, tags, poster
+  200 : { message, event }
+  403 : "Not authorized to update this event"
+  404 : "Event not found"
+
+PATCH /api/events/:eventId/rsvp            [ALL AUTHENTICATED]
+  Toggle RSVP for the current user.
+  200 : { message, rsvpCount, userRsvpd }
+  404 : "Event not found"
+
+DELETE /api/events/:eventId                [FACULTY | ADMIN — organizer or ADMIN]
+  Soft-deletes the event (sets isActive = false). Removes poster from Cloudinary.
+  200 : { message: "Event deleted" }
+  403 : "Not authorized to delete this event"
+  404 : "Event not found"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Event types: COLLEGE (college-wide), GROUP (scoped to a group),
+  CLUB (reserved for future club system).
+• Poster images are stored on Cloudinary under collegehub/event_posters.
+• RSVP is a toggle — call PATCH /rsvp again to un-RSVP.
+• Delete is a soft-delete; isActive is set to false.
+• The events listing hides the full rsvps array and returns
+  only rsvpCount + userRsvpd for performance.

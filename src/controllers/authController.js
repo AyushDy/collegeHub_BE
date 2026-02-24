@@ -1,10 +1,11 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const cloudinary = require("../config/cloudinary");
 
 exports.register = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, name } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser)
@@ -16,6 +17,7 @@ exports.register = async (req, res) => {
       email,
       password: hashedPassword,
       role,
+      name: name?.trim() || null,
     });
 
     const token = jwt.sign(
@@ -33,7 +35,7 @@ exports.register = async (req, res) => {
 
     res.status(201).json({
       message: "User created",
-      user: { id: user._id, email: user.email, role: user.role },
+      user: { id: user._id, email: user.email, role: user.role, name: user.name, profilePicture: user.profilePicture },
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -80,8 +82,51 @@ exports.login = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.json({ message: "Logged in", user: { id: user._id, email: user.email, role: user.role } });
+    res.json({ message: "Logged in", user: { id: user._id, email: user.email, role: user.role, name: user.name, profilePicture: user.profilePicture } });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// PATCH /api/auth/profile-picture — upload profile picture (all roles)
+exports.uploadProfilePicture = async (req, res) => {
+  try {
+    if (!req.file)
+      return res.status(400).json({ message: "Image file is required" });
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Delete old image from Cloudinary if exists
+    if (user.profilePicture) {
+      const publicId = user.profilePicture.split("/").slice(-2).join("/").split(".")[0];
+      await cloudinary.uploader.destroy(`collegehub/${publicId}`).catch(() => {});
+    }
+
+    user.profilePicture = req.file.path;
+    await user.save();
+
+    res.json({ message: "Profile picture updated", profilePicture: user.profilePicture });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// DELETE /api/auth/profile-picture — remove profile picture
+exports.deleteProfilePicture = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.profilePicture) {
+      const publicId = user.profilePicture.split("/").slice(-2).join("/").split(".")[0];
+      await cloudinary.uploader.destroy(`collegehub/${publicId}`).catch(() => {});
+      user.profilePicture = null;
+      await user.save();
+    }
+
+    res.json({ message: "Profile picture removed" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };

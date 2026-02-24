@@ -16,6 +16,16 @@ const userSchema = new mongoose.Schema(
       enum: ["ADMIN", "FACULTY", "STUDENT"],
       default: "STUDENT",
     },
+    name: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: null,
+    },
+    profilePicture: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
