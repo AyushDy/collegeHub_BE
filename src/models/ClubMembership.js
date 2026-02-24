@@ -21,8 +21,6 @@ const clubMembershipSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-clubMembershipSchema.index({ userId: 1, clubId: 1 }, { unique: true });
-clubMembershipSchema.index({ clubId: 1 });
-clubMembershipSchema.index({ userId: 1 });
+
 
 module.exports = mongoose.model("ClubMembership", clubMembershipSchema);

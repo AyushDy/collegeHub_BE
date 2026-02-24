@@ -23,8 +23,6 @@ const groupMembershipSchema = new mongoose.Schema(
 
 // Unique membership per user per group
 groupMembershipSchema.index({ userId: 1, groupId: 1 }, { unique: true });
-// Fast lookups by group (member lists) and by user (my groups)
-groupMembershipSchema.index({ groupId: 1 });
-groupMembershipSchema.index({ userId: 1 });
+
 
 module.exports = mongoose.model("GroupMembership", groupMembershipSchema);

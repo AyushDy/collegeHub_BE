@@ -48,9 +48,5 @@ const forumThreadSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-forumThreadSchema.index({ isActive: 1, lastActivity: -1 });
-forumThreadSchema.index({ topic: 1, isActive: 1 });
-forumThreadSchema.index({ createdBy: 1 });
-forumThreadSchema.index({ title: "text", topic: "text", tags: "text" });
 
 module.exports = mongoose.model("ForumThread", forumThreadSchema);

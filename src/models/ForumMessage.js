@@ -37,7 +37,6 @@ const forumReplySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-forumReplySchema.index({ forumId: 1, parentReplyId: 1, createdAt: -1 });
-forumReplySchema.index({ parentReplyId: 1, createdAt: 1 });
+
 
 module.exports = mongoose.model("ForumReply", forumReplySchema);

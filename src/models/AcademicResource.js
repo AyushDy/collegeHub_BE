@@ -51,9 +51,6 @@ const academicResourceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-academicResourceSchema.index({ groupId: 1, type: 1, createdAt: -1 });
-academicResourceSchema.index({ groupId: 1, subject: 1 });
-academicResourceSchema.index({ uploadedBy: 1 });
-academicResourceSchema.index({ title: "text", subject: "text", tags: "text" });
+
 
 module.exports = mongoose.model("AcademicResource", academicResourceSchema);

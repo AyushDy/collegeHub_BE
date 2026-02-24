@@ -38,8 +38,6 @@ const clubSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-clubSchema.index({ isActive: 1, category: 1 });
-clubSchema.index({ leader: 1 });
-clubSchema.index({ name: "text", tags: "text" });
+
 
 module.exports = mongoose.model("Club", clubSchema);

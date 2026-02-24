@@ -66,11 +66,6 @@ const eventSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-eventSchema.index({ isActive: 1, date: -1 });
-eventSchema.index({ type: 1, isActive: 1 });
-eventSchema.index({ groupId: 1, isActive: 1 });
-eventSchema.index({ clubId: 1, isActive: 1 });
-eventSchema.index({ organizer: 1 });
-eventSchema.index({ title: "text", tags: "text" });
+
 
 module.exports = mongoose.model("Event", eventSchema);

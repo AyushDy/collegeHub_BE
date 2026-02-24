@@ -35,6 +35,6 @@ const aiDoubtChatSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-aiDoubtChatSchema.index({ userId: 1 });
+
 
 module.exports = mongoose.model("AiDoubtChat", aiDoubtChatSchema);
