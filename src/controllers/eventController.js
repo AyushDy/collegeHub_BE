@@ -1,8 +1,54 @@
 const Event = require("../models/Event");
 const AcademicGroup = require("../models/AcademicGroup");
 const Club = require("../models/Club");
+const Notification = require("../models/Notification");
+const GroupMembership = require("../models/GroupMembership");
+const ClubMembership = require("../models/ClubMembership");
+const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
 const { isClubLeader } = require("../utils/clubMembership");
+
+// ─── Helper: fan-out event notifications ─────────────────────────────────────
+const notifyEvent = async (event) => {
+  let targetUserIds = [];
+
+  if (event.type === "COLLEGE") {
+    // Notify ALL users
+    const users = await User.find({}, "_id").lean();
+    targetUserIds = users.map((u) => u._id);
+  } else if (event.type === "GROUP" && event.groupId) {
+    // Notify all members of the academic group
+    const memberships = await GroupMembership.find({ groupId: event.groupId }).lean();
+    targetUserIds = memberships.map((m) => m.userId);
+  } else if (event.type === "CLUB" && event.clubId) {
+    // Notify all members of the club
+    const memberships = await ClubMembership.find({ clubId: event.clubId }).lean();
+    targetUserIds = memberships.map((m) => m.userId);
+  }
+
+  if (!targetUserIds.length) return;
+
+  // Exclude the organizer from receiving their own notification
+  const organizerId = event.organizer.toString();
+  const filtered = targetUserIds.filter((id) => id.toString() !== organizerId);
+  if (!filtered.length) return;
+
+  const notifications = filtered.map((userId) => ({
+    targetUserId: userId,
+    targetGroupId: event.type === "GROUP" ? event.groupId : null,
+    type: "EVENT",
+    payload: {
+      eventId: event._id,
+      title: event.title,
+      message: `New event: ${event.title}`,
+      createdBy: event.organizer,
+      eventDate: event.date,
+      clubId: event.clubId || null,
+    },
+  }));
+
+  await Notification.insertMany(notifications);
+};
 
 // ─── EVENT ENDPOINTS ─────────────────────────────────────────────────────────
 
@@ -55,6 +101,11 @@ exports.createEvent = async (req, res) => {
     });
 
     await event.populate("organizer", "email role name profilePicture");
+
+    // Fire-and-forget notification fan-out
+    notifyEvent(event).catch((err) =>
+      console.error("Event notification error:", err.message)
+    );
 
     res.status(201).json({ message: "Event created", event });
   } catch (err) {

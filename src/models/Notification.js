@@ -25,13 +25,25 @@ const notificationSchema = new mongoose.Schema(
         ref: "Quiz",
         default: null,
       },
+      eventId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Event",
+        default: null,
+      },
+      clubId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Club",
+        default: null,
+      },
       title: { type: String, default: null },
+      message: { type: String, default: null },
       createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         default: null,
       },
       startAt: { type: Date, default: null },
+      eventDate: { type: Date, default: null },
     },
     isRead: {
       type: Boolean,

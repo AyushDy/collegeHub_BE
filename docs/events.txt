@@ -68,3 +68,9 @@ DELETE /api/events/:eventId                [FACULTY | ADMIN — organizer or ADM
 • Delete is a soft-delete; isActive is set to false.
 • The events listing hides the full rsvps array and returns
   only rsvpCount + userRsvpd for performance.
+• Notifications are auto-sent on event creation:
+  - COLLEGE events → all users
+  - GROUP events → all group members
+  - CLUB events → all club members
+  The organizer does not receive their own notification.
+  Notification type: "EVENT", payload includes eventId, title, eventDate, createdBy.

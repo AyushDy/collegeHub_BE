@@ -36,6 +36,7 @@ Errors:
   forums.txt         — /api/forums
   events.txt         — /api/events
   clubs.txt          — /api/clubs
+  dashboard.txt      — /api/dashboard
   socket.txt         — Socket.IO events (groups, threads, quiz)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -123,6 +124,7 @@ Errors:
   PATCH  /api/clubs/:clubId/members/:userId            ✓*    ✓
   DELETE /api/clubs/:clubId/members/:userId            ✓*    ✓
   PATCH  /api/clubs/:clubId/transfer                   ✓*    ✓
+  GET    /api/dashboard                          ✓     ✓     ✓
   ─────────────────────────────────────────────────────────
   * ownership enforced in controller (thread author only)
   * /api/quiz/:quizId/start — creator (any role), FACULTY, or ADMIN

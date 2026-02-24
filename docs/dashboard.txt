@@ -1,0 +1,68 @@
+DASHBOARD  —  /api/dashboard
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GET /api/dashboard                         [ALL AUTHENTICATED]
+  Returns a role-based summary of the user's data.
+  200 : { user, unreadNotifications, recentNotifications, upcomingEvents, role, ...roleData }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  COMMON FIELDS (all roles)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  user                   — User object (no password)
+  unreadNotifications    — Number (unread count)
+  recentNotifications    — Array (last 5)
+  upcomingEvents         — Array (next 5, with rsvpCount + userRsvpd)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STUDENT RESPONSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  profile                — StudentProfile or null
+  groups                 — Academic groups the student belongs to
+  clubs                  — Clubs joined (with clubRole)
+  stats:
+    groupCount           — Number of academic groups
+    clubCount            — Number of clubs joined
+    unresolvedThreads    — Unresolved discussion threads in student's groups
+    totalThreadsInGroups — Total discussion threads in student's groups
+    quizzesAvailable     — Active/running quizzes in student's groups
+    quizzesParticipated  — Quizzes the student has taken
+    resourcesInGroups    — Resources available in student's groups
+    roadmaps             — AI roadmaps created
+    studyPlans           — AI study plans created
+    forumThreads         — Forum threads created by the student
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FACULTY RESPONSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  clubsManaged           — Clubs where faculty is leader/co-leader (with clubRole)
+  recentQuizzes          — Last 5 quizzes created (title, group, status, participantCount)
+  stats:
+    totalGroups          — All active academic groups
+    totalStudents        — Total student count
+    eventsOrganized      — Events created by this faculty
+    quizzesCreated       — Quizzes created by this faculty
+    resourcesUploaded    — Resources uploaded by this faculty
+    totalThreads         — All discussion threads
+    unresolvedThreads    — Unresolved discussion threads
+    totalForumThreads    — All active forum threads
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ADMIN RESPONSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  recentUsers            — Last 5 signups (email, role, name, createdAt)
+  stats:
+    users.total          — Total users
+    users.students       — Student count
+    users.faculty        — Faculty count
+    users.admins         — Admin count
+    groups               — Active academic groups
+    clubs                — Active clubs
+    events.total         — All active events
+    events.upcoming      — Events with future dates
+    events.byType        — { college, group, club }
+    quizzes              — Total quizzes
+    resources            — Total resources
+    threads.total        — All discussion threads
+    threads.unresolved   — Unresolved threads
+    forumThreads         — Active forum threads
+    notifications        — Total notifications sent
