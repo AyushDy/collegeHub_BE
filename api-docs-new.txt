@@ -19,7 +19,7 @@ all built around the structure of a real college.
                organise events, and view student data.
 
   Admin      — Full platform oversight, can view all statistics and
-               manage the entire system.
+               manage the entire system. 
 
 
   FEATURES
