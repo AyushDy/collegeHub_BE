@@ -13,10 +13,14 @@ router.get("/roadmap", protect, aiController.getRoadmaps);
 router.get("/roadmap/:roadmapId", protect, aiController.getRoadmap);
 
 // ─── PERSONALIZED STUDY PLAN BUILDER ──────────────────────────────────────
-// POST /api/ai/study-plan       — generate a weekly study plan
+// POST /api/ai/study-plan          — generate & save a weekly study plan
+// GET  /api/ai/study-plan          — list all saved study plans (summary)
+// GET  /api/ai/study-plan/:planId  — fetch full study plan by ID
 // Body: { subjects, examDate?, hoursPerDay?, goals? }
 
 router.post("/study-plan", protect, aiController.generateStudyPlan);
+router.get("/study-plan", protect, aiController.getStudyPlans);
+router.get("/study-plan/:planId", protect, aiController.getStudyPlan);
 
 // ─── SMART DOUBT ASSISTANCE ────────────────────────────────────────────────
 // POST /api/ai/doubt-assist/:threadId — AI-suggested reply for a thread

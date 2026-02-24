@@ -30,19 +30,30 @@ GET /api/ai/roadmap/:roadmapId   [ALL — owner only]
   404  : "Roadmap not found"
 
 ──────────────────────────────────────────
-STUDY PLAN
+ STUDY PLAN
 ──────────────────────────────────────────
 
 POST /api/ai/study-plan          [ALL]
   Body : { subjects[](req), examDate?(ISO), hoursPerDay?(def 4), goals? }
-  200  : { message, plan: {
-             totalWeeks, dailyHours,
-             weeklyPlan: [{ week, focus,
-               dailySchedule: [{ day, subject, topics[], hours, task }]
-             }],
-             revisionStrategy, tips[]
+  201  : { message, studyPlan: {
+             _id, userId, subjects, examDate, hoursPerDay, goals,
+             plan: {
+               totalWeeks, dailyHours,
+               weeklyPlan: [{ week, focus,
+                 dailySchedule: [{ day, subject, topics[], hours, task }]
+               }],
+               revisionStrategy, tips[]
+             },
+             createdAt, updatedAt
            }}
   400  : "subjects array is required"
+
+GET /api/ai/study-plan           [ALL]
+  200  : { count, studyPlans: [{ _id, subjects, examDate, hoursPerDay, goals, createdAt }] }
+
+GET /api/ai/study-plan/:planId   [ALL — owner only]
+  200  : { studyPlan }  (full payload)
+  404  : "Study plan not found"
 
 ──────────────────────────────────────────
 DOUBT ASSIST

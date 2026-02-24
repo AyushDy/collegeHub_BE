@@ -124,7 +124,10 @@
     - DELETE /api/ai/roadmap/:roadmapId → delete roadmap
     - Model: src/models/Roadmap.js (userId, skill, level, goal, roadmap JSON)
 ✅ Personalized study plan builder
-    - POST /api/ai/study-plan           → weekly plan from subjects + exam date + hours/day
+    - POST /api/ai/study-plan           → generate & persist weekly plan (subjects + exam date + hours/day)
+    - GET  /api/ai/study-plan           → list user's saved study plans
+    - GET  /api/ai/study-plan/:planId   → fetch full study plan
+    - Model: src/models/StudyPlan.js (userId, subjects, examDate, hoursPerDay, goals, plan JSON)
 ✅ Smart doubt assistance (AI reply suggestions)
     - POST /api/ai/doubt-assist/:threadId → AI reply suggestion for a discussion thread
 ✅ AI-based content/resource recommendations

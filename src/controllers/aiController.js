@@ -1,5 +1,6 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Roadmap = require("../models/Roadmap");
+const StudyPlan = require("../models/StudyPlan");
 const DiscussionThread = require("../models/DiscussionThread");
 const DiscussionReply = require("../models/DiscussionReply");
 const StudentProfile = require("../models/StudentProfile");
@@ -185,7 +186,44 @@ Return ONLY valid JSON (no markdown, no extra text):
     const text = await generateWithRetry(prompt);
     const plan = parseGeminiJSON(text);
 
-    res.json({ message: "Study plan generated", plan });
+    const saved = await StudyPlan.create({
+      userId: req.user.userId,
+      subjects,
+      examDate: examDate ? new Date(examDate) : null,
+      hoursPerDay,
+      goals: goals?.trim() || null,
+      plan,
+    });
+
+    res.status(201).json({ message: "Study plan generated", studyPlan: saved });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /api/ai/study-plan — list all saved study plans for current user (summary)
+exports.getStudyPlans = async (req, res) => {
+  try {
+    const plans = await StudyPlan.find({ userId: req.user.userId })
+      .sort({ createdAt: -1 })
+      .select("subjects examDate hoursPerDay goals createdAt");
+
+    res.json({ count: plans.length, studyPlans: plans });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /api/ai/study-plan/:planId — get full study plan
+exports.getStudyPlan = async (req, res) => {
+  try {
+    const studyPlan = await StudyPlan.findOne({
+      _id: req.params.planId,
+      userId: req.user.userId,
+    });
+    if (!studyPlan) return res.status(404).json({ message: "Study plan not found" });
+
+    res.json({ studyPlan });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
