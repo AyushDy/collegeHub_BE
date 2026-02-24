@@ -1,0 +1,30 @@
+GROUPS  —  /api/groups
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GET /api/groups/my               [STUDENT]
+  200 : { groups: [{ _id, name, type, branch, year, section, isActive, socketRoom }] }
+  404 : "No groups found. Create a profile first."
+
+GET /api/groups                  [FACULTY | ADMIN]
+  Query: branch?, year?, section?, type?(YEAR|YEAR_SECTION)
+  200  : { count, groups[] }
+
+GET /api/groups/:groupId/members [FACULTY | ADMIN]
+  200  : { groupName, count, members[] }
+  404  : "Group not found"
+
+GET /api/groups/:groupId/open    [ALL — STUDENT must be member]
+  200  : { group: { _id, name, type, branch, year, section, isActive, socketRoom } }
+  403  : "You are not a member of this group"
+  404  : "Group not found"
+
+POST /api/groups/:groupId/chat   [STUDENT — must be member]
+  Body : { message }
+  201  : { message, data: { _id, groupId, sender, message, isEdited, createdAt } }
+  400  : "Message cannot be empty"
+  403  : "You are not a member of this group"
+
+GET /api/groups/:groupId/chat    [ALL — STUDENT must be member]
+  Query: page?(def 1), limit?(def 50, max 100)
+  200  : { total, page, limit, messages[] }
+  403  : "You are not a member of this group"

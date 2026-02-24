@@ -1,0 +1,23 @@
+AUTH  —  /api/auth
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+POST /api/auth/register
+  Roles : public
+  Body  : { email, password, role: ADMIN|FACULTY|STUDENT }
+  201   : Sets-Cookie: token  |  { message, user: { id, email, role } }
+  400   : "User already exists"
+
+POST /api/auth/login
+  Roles : public
+  Body  : { email, password }
+  200   : Sets-Cookie: token  |  { message, user: { id, email, role } }
+  400   : "Invalid credentials"
+
+GET /api/auth/me
+  Roles : ALL (protect)
+  200   : { user: { _id, email, role, createdAt, updatedAt } }
+  404   : "User not found"
+
+POST /api/auth/logout
+  Roles : public
+  200   : Clears-Cookie: token  |  { message: "Logged out" }

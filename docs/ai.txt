@@ -1,0 +1,86 @@
+AI  —  /api/ai
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All routes: protect. Model: Gemini 1.5 Flash. Env: GEMINI_API_KEY.
+Roadmap endpoints persist to DB. All others are ephemeral.
+
+──────────────────────────────────────────
+ROADMAP
+──────────────────────────────────────────
+
+POST /api/ai/roadmap             [ALL]
+  Body : { skill(req), level?(def "beginner"), goal? }
+  201  : { message, roadmap: {
+             _id, userId, skill, level, goal,
+             roadmap: {
+               skill, overview, totalDuration,
+               phases: [{ phase, title, duration, topics[], resources[],
+                          project: { title, description } }],
+               finalProject: { title, description },
+               tips[]
+             },
+             createdAt, updatedAt
+           }}
+  400  : "skill is required"
+
+GET /api/ai/roadmap              [ALL]
+  200  : { count, roadmaps: [{ _id, skill, level, goal, createdAt }] }
+
+GET /api/ai/roadmap/:roadmapId   [ALL — owner only]
+  200  : { roadmap }  (full payload)
+  404  : "Roadmap not found"
+
+──────────────────────────────────────────
+STUDY PLAN
+──────────────────────────────────────────
+
+POST /api/ai/study-plan          [ALL]
+  Body : { subjects[](req), examDate?(ISO), hoursPerDay?(def 4), goals? }
+  200  : { message, plan: {
+             totalWeeks, dailyHours,
+             weeklyPlan: [{ week, focus,
+               dailySchedule: [{ day, subject, topics[], hours, task }]
+             }],
+             revisionStrategy, tips[]
+           }}
+  400  : "subjects array is required"
+
+──────────────────────────────────────────
+DOUBT ASSIST
+──────────────────────────────────────────
+
+POST /api/ai/doubt-assist/:threadId   [ALL]
+  Reads thread + up to 10 existing replies, returns AI suggestion.
+  200  : { message, threadId, threadTitle,
+           suggestion: { suggestedReply, keyPoints[], relatedTopics[],
+                         confidence: high|medium|low } }
+  404  : "Thread not found"
+
+──────────────────────────────────────────
+RESOURCE RECOMMENDATIONS
+──────────────────────────────────────────
+
+GET /api/ai/recommendations      [STUDENT only]
+  Requires existing StudentProfile. Uses branch, year, skills, interests.
+  200  : { message, data: {
+             focusAreas[],
+             recommendations: [{  (exactly 10)
+               title, description, url,
+               type: video|course|article|book|tool|documentation,
+               topic, difficulty: beginner|intermediate|advanced,
+               isFree, estimatedTime
+             }]
+           }}
+  404  : "Student profile not found. Create a profile first."
+
+──────────────────────────────────────────
+STUDY SUGGESTIONS
+──────────────────────────────────────────
+
+POST /api/ai/study-suggestions   [ALL]
+  Body : { weakSubjects[](req), strongSubjects[]?, recentScores?{sub:num}, goals? }
+  200  : { message, suggestions: {
+             analysis, prioritySubjects[],
+             suggestions: [{ subject, issue, strategy, resources[], weeklyHours }],
+             milestones[], motivationalTip
+           }}
+  400  : "weakSubjects array is required"

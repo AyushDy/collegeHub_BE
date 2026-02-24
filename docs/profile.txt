@@ -1,0 +1,27 @@
+PROFILE  —  /api/profile
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All routes: protect + authorize("STUDENT") unless noted.
+
+POST /api/profile
+  Note : One-time. Auto-creates YEAR + YEAR_SECTION groups and enrols student.
+  Body : { branch, year(1-4), section, rollNumber, skills?, interests?,
+           resumeLink?(gdrive), portfolioLink?(gdrive) }
+  201  : { message, profile }
+  400  : "Profile already exists" | ValidationError
+
+GET /api/profile/me
+  200  : { profile }  (userId populated)
+  404  : "Profile not found. Please create one."
+
+PUT /api/profile
+  Body : any subset of POST fields
+  200  : { message, profile }
+  404  : "Profile not found"
+
+GET /api/profile/filter          [FACULTY | ADMIN]
+  Query: year?, section?, branch?
+  200  : { count, profiles[] }
+
+GET /api/profile/view/:id        [FACULTY | ADMIN]
+  200  : { profile }  (userId populated)
+  404  : "Profile not found"

@@ -1,0 +1,21 @@
+SOCKET.IO  —  ws://localhost:5000
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connection requires credentials: true (same JWT cookie forwarded).
+socketRoom from GET /api/groups/my == groupId used in events.
+
+CLIENT → SERVER
+  joinGroup    { groupId }
+  leaveGroup   { groupId }
+  sendMessage  { groupId, message }
+
+  createThread { groupId, title, content, subject? }   [STUDENT — member]
+  replyToThread{ threadId, content }                   [ALL — member]
+  resolveThread{ threadId }                            [author | FACULTY | ADMIN]
+  acceptReply  { replyId }                             [STUDENT — thread author]
+
+SERVER → CLIENT
+  newMessage      { _id, groupId, sender, message, isEdited, createdAt }
+  newThread       { thread }                 → emitted to groupId room
+  newReply        { threadId, reply }        → emitted to groupId room
+  threadResolved  { threadId, resolvedBy }   → emitted to groupId room
+  replyAccepted   { replyId, threadId }      → emitted to groupId room

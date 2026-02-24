@@ -1,0 +1,71 @@
+COLLEGEHUB BACKEND — API OVERVIEW
+Base URL: http://localhost:5000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AUTH MECHANISM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Cookie-based JWT. No Authorization header needed.
+
+Cookie name : token
+Flags       : HttpOnly | Secure (prod) | SameSite=Strict | MaxAge=7d
+
+Set on /register + /login, cleared on /logout.
+Include cookie on every protected request (credentials: true).
+
+Middleware:
+  protect      — verifies token → injects req.user { userId, role }
+  authorize()  — role guard, follows protect
+
+Errors:
+  401  { "message": "Not authorized" }   — cookie missing
+  401  { "message": "Token invalid" }    — bad/expired token
+  403  { "message": "Access denied" }    — wrong role
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  auth.txt      — /api/auth
+  profile.txt   — /api/profile
+  groups.txt    — /api/groups
+  chat.txt      — /api/chat
+  threads.txt   — /api/threads
+  ai.txt        — /api/ai
+  socket.txt    — Socket.IO events
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ROLE SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Endpoint                                   STU   FAC   ADM
+  ─────────────────────────────────────────────────────────
+  POST   /api/auth/register                   ✓     ✓     ✓
+  POST   /api/auth/login                      ✓     ✓     ✓
+  GET    /api/auth/me                         ✓     ✓     ✓
+  POST   /api/auth/logout                     ✓     ✓     ✓
+  POST   /api/profile                         ✓
+  GET    /api/profile/me                      ✓
+  PUT    /api/profile                         ✓
+  GET    /api/profile/filter                        ✓     ✓
+  GET    /api/profile/view/:id                      ✓     ✓
+  GET    /api/groups/my                       ✓
+  GET    /api/groups                                ✓     ✓
+  GET    /api/groups/:groupId/members               ✓     ✓
+  GET    /api/groups/:groupId/open            ✓     ✓     ✓
+  POST   /api/groups/:groupId/chat            ✓
+  GET    /api/groups/:groupId/chat            ✓     ✓     ✓
+  PUT    /api/chat/:messageId                 ✓
+  DELETE /api/chat/:messageId                 ✓
+  POST   /api/threads/:groupId                ✓
+  GET    /api/threads/:groupId                ✓     ✓     ✓
+  GET    /api/threads/thread/:threadId        ✓     ✓     ✓
+  POST   /api/threads/thread/:threadId/reply  ✓     ✓     ✓
+  PUT    /api/threads/thread/:threadId/resolve ✓*   ✓     ✓
+  PUT    /api/threads/reply/:replyId/accept   ✓*
+  POST   /api/ai/roadmap                      ✓     ✓     ✓
+  GET    /api/ai/roadmap                      ✓     ✓     ✓
+  GET    /api/ai/roadmap/:roadmapId           ✓     ✓     ✓
+  POST   /api/ai/study-plan                   ✓     ✓     ✓
+  POST   /api/ai/doubt-assist/:threadId       ✓     ✓     ✓
+  GET    /api/ai/recommendations              ✓
+  POST   /api/ai/study-suggestions            ✓     ✓     ✓
+  ─────────────────────────────────────────────────────────
+  * ownership enforced in controller (thread author only)

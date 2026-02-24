@@ -1,0 +1,33 @@
+THREADS  —  /api/threads
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All routes require protect. Member check enforced for group-scoped routes.
+
+POST /api/threads/:groupId                   [STUDENT — member]
+  Body : { title, content, subject?(def "General") }
+  201  : { message, thread: { _id, groupId, author, title, content, subject,
+           isResolved: false, resolvedBy: null, createdAt } }
+  400  : "Title and content are required"
+  403  : "You are not a member of this group"
+
+GET /api/threads/:groupId                    [ALL — member]
+  Query: subject?, resolved?("true"|"false"), page?(def 1), limit?(def 20, max 100)
+  200  : { total, page, limit, threads[] }
+
+GET /api/threads/thread/:threadId            [ALL — member]
+  200  : { thread, replies[] }
+  404  : "Thread not found"
+
+POST /api/threads/thread/:threadId/reply     [ALL — member]
+  Body : { content }
+  201  : { message, reply: { _id, threadId, author, content, isAccepted: false } }
+  400  : "Reply content is required"
+
+PUT /api/threads/thread/:threadId/resolve    [thread author | FACULTY | ADMIN]
+  200  : { message, thread: { ..., isResolved: true, resolvedBy } }
+  403  : "Only the thread author or faculty/admin can resolve this"
+
+PUT /api/threads/reply/:replyId/accept       [STUDENT — thread author only]
+  Note : Un-accepts any previously accepted reply in the same thread.
+  200  : { message, reply: { ..., isAccepted: true } }
+  403  : "Only the thread author can accept a reply"
+  404  : "Reply not found" | "Thread not found"

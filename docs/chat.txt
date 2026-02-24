@@ -1,0 +1,15 @@
+CHAT  —  /api/chat  (edit / delete own messages)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All routes: protect + authorize("STUDENT"). Sender ownership enforced.
+
+PUT /api/chat/:messageId
+  Body : { message }
+  200  : { message: "Message updated", data: { ..., isEdited: true } }
+  400  : "Message cannot be empty"
+  403  : "You can only edit your own messages"
+  404  : "Message not found"
+
+DELETE /api/chat/:messageId
+  200  : { message: "Message deleted" }
+  403  : "You can only delete your own messages"
+  404  : "Message not found"
