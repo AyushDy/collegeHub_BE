@@ -39,10 +39,16 @@ const eventSchema = new mongoose.Schema(
       enum: ["COLLEGE", "GROUP", "CLUB"],
       default: "COLLEGE",
     },
-    // Optional — set when type is GROUP (or CLUB in the future)
+    // Set when type is GROUP
     groupId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AcademicGroup",
+      default: null,
+    },
+    // Set when type is CLUB
+    clubId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Club",
       default: null,
     },
     organizer: {
@@ -63,6 +69,7 @@ const eventSchema = new mongoose.Schema(
 eventSchema.index({ isActive: 1, date: -1 });
 eventSchema.index({ type: 1, isActive: 1 });
 eventSchema.index({ groupId: 1, isActive: 1 });
+eventSchema.index({ clubId: 1, isActive: 1 });
 eventSchema.index({ organizer: 1 });
 eventSchema.index({ title: "text", tags: "text" });
 

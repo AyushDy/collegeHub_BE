@@ -1,6 +1,8 @@
 const Event = require("../models/Event");
 const AcademicGroup = require("../models/AcademicGroup");
+const Club = require("../models/Club");
 const cloudinary = require("../config/cloudinary");
+const { isClubLeader } = require("../utils/clubMembership");
 
 // ─── EVENT ENDPOINTS ─────────────────────────────────────────────────────────
 
@@ -25,6 +27,19 @@ exports.createEvent = async (req, res) => {
         return res.status(404).json({ message: "Group not found" });
     }
 
+    // If CLUB type, validate the club exists and caller is leader/admin
+    const { clubId } = req.body;
+    if (eventType === "CLUB") {
+      if (!clubId)
+        return res.status(400).json({ message: "clubId is required for CLUB events" });
+      const club = await Club.findOne({ _id: clubId, isActive: true });
+      if (!club)
+        return res.status(404).json({ message: "Club not found" });
+      const authorized = await isClubLeader(req.user.userId, req.user.role, clubId);
+      if (!authorized)
+        return res.status(403).json({ message: "Only club leaders or ADMIN can create club events" });
+    }
+
     const event = await Event.create({
       title: title.trim(),
       description: description?.trim() || "",
@@ -34,6 +49,7 @@ exports.createEvent = async (req, res) => {
       venue: venue?.trim() || null,
       type: eventType,
       groupId: eventType === "GROUP" ? groupId : null,
+      clubId: eventType === "CLUB" ? clubId : null,
       organizer: req.user.userId,
       tags: Array.isArray(tags) ? tags.map((t) => t.trim()) : [],
     });
@@ -65,6 +81,9 @@ exports.listEvents = async (req, res) => {
     // Filter by group
     if (req.query.groupId) filter.groupId = req.query.groupId;
 
+    // Filter by club
+    if (req.query.clubId) filter.clubId = req.query.clubId;
+
     // Upcoming only
     if (req.query.upcoming === "true") {
       filter.date = { $gte: new Date() };
@@ -82,6 +101,7 @@ exports.listEvents = async (req, res) => {
         .limit(limit)
         .populate("organizer", "email role name profilePicture")
         .populate("groupId", "name branch year section")
+        .populate("clubId", "name logo category")
         .lean(),
       Event.countDocuments(filter),
     ]);
@@ -113,6 +133,7 @@ exports.getEvent = async (req, res) => {
     const event = await Event.findOne({ _id: req.params.eventId, isActive: true })
       .populate("organizer", "email role name profilePicture")
       .populate("groupId", "name branch year section")
+      .populate("clubId", "name logo category")
       .populate("rsvps", "email name profilePicture")
       .lean();
 

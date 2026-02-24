@@ -11,13 +11,17 @@ POST /api/events                           [FACULTY | ADMIN]
     venue        : String (max 200)
     type         : "COLLEGE" (default) | "GROUP" | "CLUB"
     groupId      : ObjectId — required when type = GROUP
+    clubId       : ObjectId — required when type = CLUB (caller must be club leader/ADMIN)
     tags         : String[] (array of tag strings)
     poster       : Image file (jpg/png/webp, max 5 MB)
   201 : { message, event }
   400 : "Title and date are required"
   400 : "Invalid event type"
   400 : "groupId is required for GROUP events"
+  400 : "clubId is required for CLUB events"
+  403 : "Only club leaders or ADMIN can create club events"
   404 : "Group not found"
+  404 : "Club not found"
 
 GET /api/events                            [ALL AUTHENTICATED]
   Query:
@@ -25,6 +29,7 @@ GET /api/events                            [ALL AUTHENTICATED]
     limit    : Number (default 20, max 100)
     type     : "COLLEGE" | "GROUP" | "CLUB"
     groupId  : ObjectId — filter by group
+    clubId   : ObjectId — filter by club
     upcoming : "true" — only events with date >= now
     search   : text search on title + tags
   200 : { page, limit, totalPages, totalEvents, events[] }
@@ -57,7 +62,7 @@ DELETE /api/events/:eventId                [FACULTY | ADMIN — organizer or ADM
   NOTES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • Event types: COLLEGE (college-wide), GROUP (scoped to a group),
-  CLUB (reserved for future club system).
+  CLUB (scoped to a club — only club leaders/ADMIN can create).
 • Poster images are stored on Cloudinary under collegehub/event_posters.
 • RSVP is a toggle — call PATCH /rsvp again to un-RSVP.
 • Delete is a soft-delete; isActive is set to false.

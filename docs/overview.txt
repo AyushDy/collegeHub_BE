@@ -35,6 +35,7 @@ Errors:
   resources.txt      — /api/resources
   forums.txt         — /api/forums
   events.txt         — /api/events
+  clubs.txt          — /api/clubs
   socket.txt         — Socket.IO events (groups, threads, quiz)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -111,9 +112,23 @@ Errors:
   PATCH  /api/events/:eventId                          ✓*    ✓
   PATCH  /api/events/:eventId/rsvp               ✓     ✓     ✓
   DELETE /api/events/:eventId                          ✓*    ✓
+  POST   /api/clubs                                    ✓     ✓
+  GET    /api/clubs                              ✓     ✓     ✓
+  GET    /api/clubs/:clubId                      ✓     ✓     ✓
+  PATCH  /api/clubs/:clubId                            ✓*    ✓
+  DELETE /api/clubs/:clubId                            ✓*    ✓
+  POST   /api/clubs/:clubId/join                 ✓
+  POST   /api/clubs/:clubId/leave                ✓
+  GET    /api/clubs/:clubId/members              ✓     ✓     ✓
+  PATCH  /api/clubs/:clubId/members/:userId            ✓*    ✓
+  DELETE /api/clubs/:clubId/members/:userId            ✓*    ✓
+  PATCH  /api/clubs/:clubId/transfer                   ✓*    ✓
   ─────────────────────────────────────────────────────────
   * ownership enforced in controller (thread author only)
   * /api/quiz/:quizId/start — creator (any role), FACULTY, or ADMIN
   * DELETE /api/resources/:resourceId — uploader, FACULTY, or ADMIN
   * DELETE /api/forums/:forumId — creator, FACULTY, or ADMIN
   * PATCH/DELETE /api/events/:eventId — organizer or ADMIN
+  * PATCH/DELETE /api/clubs/:clubId — club leader/co-leader or ADMIN
+  * PATCH/DELETE /api/clubs/:clubId/members — leader/co-leader or ADMIN
+  * PATCH /api/clubs/:clubId/transfer — leader or ADMIN only

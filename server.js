@@ -41,6 +41,7 @@ const notificationRoutes = require("./src/routes/notificationRoutes");
 const resourceRoutes = require("./src/routes/resourceRoutes");
 const forumRoutes = require("./src/routes/forumRoutes");
 const eventRoutes = require("./src/routes/eventRoutes");
+const clubRoutes = require("./src/routes/clubRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
@@ -54,6 +55,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/resources", resourceRoutes);
 app.use("/api/forums", forumRoutes);
 app.use("/api/events", eventRoutes);
+app.use("/api/clubs", clubRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

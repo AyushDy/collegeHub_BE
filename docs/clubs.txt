@@ -1,0 +1,82 @@
+CLUBS  —  /api/clubs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+POST /api/clubs                            [FACULTY | ADMIN]
+  Content-Type: multipart/form-data
+  Fields:
+    name*        : String (unique, max 100)
+    description  : String (max 2000)
+    category     : "TECH" | "CULTURAL" | "SPORTS" | "SOCIAL" | "OTHER" (default)
+    tags         : String[]
+    logo         : Image file (jpg/png/webp, max 5 MB)
+  201 : { message, club }
+  400 : "Club name is required"
+  409 : "A club with this name already exists"
+
+GET /api/clubs                             [ALL AUTHENTICATED]
+  Query:
+    page     : Number (default 1)
+    limit    : Number (default 20, max 100)
+    category : "TECH" | "CULTURAL" | "SPORTS" | "SOCIAL" | "OTHER"
+    search   : text search on name + tags
+  200 : { page, limit, totalPages, totalClubs, clubs[] }
+  Each club includes: memberCount, userJoined (boolean)
+
+GET /api/clubs/:clubId                     [ALL AUTHENTICATED]
+  200 : { club } — includes memberCount, userJoined, userRole
+  404 : "Club not found"
+
+PATCH /api/clubs/:clubId                   [LEADER | CO_LEADER | ADMIN]
+  Content-Type: multipart/form-data
+  Fields (all optional): name, description, category, tags, logo
+  200 : { message, club }
+  403 : "Not authorized to update this club"
+  404 : "Club not found"
+
+DELETE /api/clubs/:clubId                  [LEADER | CO_LEADER | ADMIN]
+  Soft-deletes the club (sets isActive = false). Removes logo from Cloudinary.
+  200 : { message: "Club deleted" }
+  403 : "Not authorized to delete this club"
+  404 : "Club not found"
+
+POST /api/clubs/:clubId/join               [STUDENT]
+  201 : { message: "Joined club", memberCount }
+  404 : "Club not found"
+  409 : "You are already a member of this club"
+
+POST /api/clubs/:clubId/leave              [STUDENT — not LEADER]
+  200 : { message: "Left club", memberCount }
+  400 : "Leaders cannot leave. Transfer leadership first."
+  404 : "You are not a member of this club"
+
+GET /api/clubs/:clubId/members             [ALL AUTHENTICATED]
+  Query: page, limit (default 30)
+  200 : { page, limit, totalMembers, members[] }
+  Each member: { user, clubRole, joinedAt }
+
+PATCH /api/clubs/:clubId/members/:userId   [LEADER | CO_LEADER | ADMIN]
+  Body: { role: "CO_LEADER" | "MEMBER" }
+  200 : { message: "Member role updated to ..." }
+  400 : "Cannot change leader role. Use transfer instead."
+  404 : "Member not found"
+
+DELETE /api/clubs/:clubId/members/:userId  [LEADER | CO_LEADER | ADMIN]
+  200 : { message: "Member removed" }
+  400 : "Cannot kick the leader"
+  404 : "Member not found"
+
+PATCH /api/clubs/:clubId/transfer          [LEADER | ADMIN]
+  Body: { newLeaderId }
+  200 : { message: "Leadership transferred" }
+  400 : "newLeaderId is required"
+  404 : "New leader must be a member of the club"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Club logos are stored on Cloudinary under collegehub/club_logos.
+• Club membership roles: LEADER (one per club), CO_LEADER, MEMBER.
+• FACULTY/ADMIN can create clubs. Creator becomes the first LEADER.
+• Students can self-join/leave. Leaders cannot leave — must transfer first.
+• Delete is a soft-delete; isActive is set to false.
+• Clubs can create events using POST /api/events with type=CLUB + clubId.
