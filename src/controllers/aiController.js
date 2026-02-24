@@ -45,48 +45,35 @@ exports.generateRoadmap = async (req, res) => {
     if (!skill || !skill.trim())
       return res.status(400).json({ message: "skill is required" });
 
-    const prompt = `You are an expert CS and tech mentor. Generate a practical, project-based learning roadmap as a directed graph suitable for rendering as a flowchart.
+    const prompt = `You are an expert CS and tech mentor. Generate a practical, project-based learning roadmap.
 
 Skill to learn: "${skill.trim()}"
 Learner level: ${level}
 Goal: ${goal?.trim() || "General proficiency and job-readiness"}
 
 Rules:
-- Model the roadmap as a graph of nodes and directed edges.
-- node types:
-    "start"     — single entry node (e.g. "Start: Learn ${skill.trim()}")
-    "topic"     — a concept or technology to learn
-    "project"   — a hands-on project to build
-    "milestone" — a phase checkpoint / summary node
-    "end"       — single exit node (e.g. "Job Ready / Goal Achieved")
-- Each node must have a unique "id" (e.g. "n1", "n2", ...) within this roadmap.
-- Each node should have: label (short, ≤ 6 words), description (1–3 sentences explaining what to learn/do), phase (integer grouping, 1-based), resources (real well-known URLs — YouTube, official docs, freeCodeCamp etc.), estimatedDuration.
-- Edges define prerequisites: { from, to, label? }. Label is optional (e.g. "after", "then", "optional").
-- Aim for 15–30 nodes total. A linear roadmap is fine; branches are allowed for optional/parallel tracks.
-- Resources must be real and preferably free.
-- Keep durations realistic for a college student with ~2–3 hours/day.
+- Each phase must include real, hands-on projects.
+- Resources must be real, well-known, and preferably free (YouTube channels, official docs, freeCodeCamp, etc.).
+- Keep durations realistic for a college student with ~2-3 hours/day.
 
 Return ONLY valid JSON matching this exact schema (no extra text, no markdown):
 {
   "skill": string,
   "overview": string,
   "totalDuration": string,
-  "nodes": [
+  "phases": [
     {
-      "id": string,
-      "type": "start" | "topic" | "project" | "milestone" | "end",
-      "label": string,
-      "description": string,
       "phase": number,
+      "title": string,
+      "duration": string,
+      "topics": string[],
       "resources": [
         { "title": string, "url": string, "type": "video|article|docs|book|course" }
       ],
-      "estimatedDuration": string
+      "project": { "title": string, "description": string }
     }
   ],
-  "edges": [
-    { "from": string, "to": string, "label": string }
-  ],
+  "finalProject": { "title": string, "description": string },
   "tips": string[]
 }`;
 

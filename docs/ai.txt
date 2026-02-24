@@ -13,37 +13,20 @@ POST /api/ai/roadmap             [ALL]
              _id, userId, skill, level, goal,
              roadmap: {
                skill, overview, totalDuration,
-               nodes: [
-                 {
-                   id,                      — unique within this roadmap (e.g. "n1")
-                   type,                    — "start" | "topic" | "project" | "milestone" | "end"
-                   label,                   — short display name (≤ 6 words)
-                   description,             — 1–3 sentence explanation
-                   phase,                   — integer grouping (1-based swim-lane)
-                   estimatedDuration,
-                   resources: [{ title, url, type: video|article|docs|book|course }]
-                 }
-               ],
-               edges: [
-                 { from, to, label? }       — directed prerequisite edges between node ids
-               ],
+               phases: [{ phase, title, duration, topics[], resources[],
+                          project: { title, description } }],
+               finalProject: { title, description },
                tips[]
              },
              createdAt, updatedAt
            }}
   400  : "skill is required"
 
-  Graph conventions:
-    - Exactly one "start" node and one "end" node.
-    - Nodes with the same "phase" belong to the same swim-lane / column.
-    - Edges run from prerequisite → dependent; optional branches are labelled "optional".
-    - Suitable for direct rendering with React Flow, D3, Mermaid, etc.
-
 GET /api/ai/roadmap              [ALL]
   200  : { count, roadmaps: [{ _id, skill, level, goal, createdAt }] }
 
 GET /api/ai/roadmap/:roadmapId   [ALL — owner only]
-  200  : { roadmap }  (full payload including nodes[] and edges[])
+  200  : { roadmap }  (full payload)
   404  : "Roadmap not found"
 
 DELETE /api/ai/roadmap/:roadmapId   [ALL — owner only]
