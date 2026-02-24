@@ -229,6 +229,21 @@ exports.getStudyPlan = async (req, res) => {
   }
 };
 
+// DELETE /api/ai/study-plan/:planId
+exports.deleteStudyPlan = async (req, res) => {
+  try {
+    const studyPlan = await StudyPlan.findOneAndDelete({
+      _id: req.params.planId,
+      userId: req.user.userId,
+    });
+    if (!studyPlan) return res.status(404).json({ message: "Study plan not found" });
+
+    res.json({ message: "Study plan deleted" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // ─── SMART DOUBT ASSISTANCE ──────────────────────────────────────────────────
 
 // POST /api/ai/doubt-assist/:threadId

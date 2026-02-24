@@ -4,23 +4,27 @@ const aiController = require("../controllers/aiController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
 // ─── AI ROADMAP GENERATOR ──────────────────────────────────────────────────
-// POST /api/ai/roadmap          — generate & save a new skill roadmap
-// GET  /api/ai/roadmap          — list all saved roadmaps (summary)
-// GET  /api/ai/roadmap/:id      — fetch full roadmap by ID
+// POST   /api/ai/roadmap          — generate & save a new skill roadmap
+// GET    /api/ai/roadmap          — list all saved roadmaps (summary)
+// GET    /api/ai/roadmap/:id      — fetch full roadmap by ID
+// DELETE /api/ai/roadmap/:id      — delete a roadmap (owner only)
 
 router.post("/roadmap", protect, aiController.generateRoadmap);
 router.get("/roadmap", protect, aiController.getRoadmaps);
 router.get("/roadmap/:roadmapId", protect, aiController.getRoadmap);
+router.delete("/roadmap/:roadmapId", protect, aiController.deleteRoadmap);
 
 // ─── PERSONALIZED STUDY PLAN BUILDER ──────────────────────────────────────
-// POST /api/ai/study-plan          — generate & save a weekly study plan
-// GET  /api/ai/study-plan          — list all saved study plans (summary)
-// GET  /api/ai/study-plan/:planId  — fetch full study plan by ID
+// POST   /api/ai/study-plan          — generate & save a weekly study plan
+// GET    /api/ai/study-plan          — list all saved study plans (summary)
+// GET    /api/ai/study-plan/:planId  — fetch full study plan by ID
+// DELETE /api/ai/study-plan/:planId  — delete a study plan (owner only)
 // Body: { subjects, examDate?, hoursPerDay?, goals? }
 
 router.post("/study-plan", protect, aiController.generateStudyPlan);
 router.get("/study-plan", protect, aiController.getStudyPlans);
 router.get("/study-plan/:planId", protect, aiController.getStudyPlan);
+router.delete("/study-plan/:planId", protect, aiController.deleteStudyPlan);
 
 // ─── SMART DOUBT ASSISTANCE ────────────────────────────────────────────────
 // POST /api/ai/doubt-assist/:threadId — AI-suggested reply for a thread

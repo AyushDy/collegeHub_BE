@@ -65,9 +65,11 @@ Errors:
   POST   /api/ai/roadmap                      ✓     ✓     ✓
   GET    /api/ai/roadmap                      ✓     ✓     ✓
   GET    /api/ai/roadmap/:roadmapId           ✓     ✓     ✓
+  DELETE /api/ai/roadmap/:roadmapId           ✓     ✓     ✓
   POST   /api/ai/study-plan                   ✓     ✓     ✓
   GET    /api/ai/study-plan                   ✓     ✓     ✓
   GET    /api/ai/study-plan/:planId           ✓     ✓     ✓
+  DELETE /api/ai/study-plan/:planId           ✓     ✓     ✓
   POST   /api/ai/doubt-assist/:threadId       ✓     ✓     ✓
   GET    /api/ai/recommendations              ✓
   POST   /api/ai/study-suggestions            ✓     ✓     ✓

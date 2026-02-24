@@ -29,6 +29,10 @@ GET /api/ai/roadmap/:roadmapId   [ALL — owner only]
   200  : { roadmap }  (full payload)
   404  : "Roadmap not found"
 
+DELETE /api/ai/roadmap/:roadmapId   [ALL — owner only]
+  200  : { message: "Roadmap deleted" }
+  404  : "Roadmap not found"
+
 ──────────────────────────────────────────
  STUDY PLAN
 ──────────────────────────────────────────
@@ -53,6 +57,10 @@ GET /api/ai/study-plan           [ALL]
 
 GET /api/ai/study-plan/:planId   [ALL — owner only]
   200  : { studyPlan }  (full payload)
+  404  : "Study plan not found"
+
+DELETE /api/ai/study-plan/:planId   [ALL — owner only]
+  200  : { message: "Study plan deleted" }
   404  : "Study plan not found"
 
 ──────────────────────────────────────────
