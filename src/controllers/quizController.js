@@ -192,6 +192,7 @@ exports.getQuizResults = async (req, res) => {
         userId: p.userId,
         score: p.score,
         totalResponseTimeMs: p.totalResponseTimeMs,
+        cheatDetected: p.cheatDetected ?? false,
         answers: p.answers,
       }));
 

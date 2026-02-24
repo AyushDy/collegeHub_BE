@@ -32,9 +32,10 @@
  *       → DB persisted (status ENDED, stats, participants)
  *
  * ─── Client → Server events ──────────────────────────────────────────────────
- *   quiz:join         { quizId }
- *   quiz:lock         { quizId }                    — creator / faculty / admin
- *   quiz:answer       { quizId, questionIndex, selectedIndex }
+ *   quiz:join             { quizId }
+ *   quiz:lock             { quizId }                    — creator / faculty / admin
+ *   quiz:answer           { quizId, questionIndex, selectedIndex }
+ *   quiz:cheat-detected   { quizId }                    — frontend signals tab-switch etc.
  *
  * ─── Server → Client events ──────────────────────────────────────────────────
  *   quiz:announced        { quizId, title, groupId, questionCount }
@@ -53,7 +54,9 @@
  *                         → quiz room
  *   quiz:question-result  { quizId, questionIndex, correctIndex, optionCounts[], correctCount }
  *                         → quiz room after question closes
- *   quiz:ended            { quizId, leaderboard[] }
+ *   quiz:cheating-flagged { quizId, userId }
+ *                         → quiz room when a participant is flagged (tab switch etc.)
+ *   quiz:ended            { quizId, leaderboard[] }   leaderboard entries include cheatDetected
  *                         → quiz room
  *   quiz:error            { message }
  *                         → requesting socket only
@@ -93,6 +96,7 @@ class QuizSession {
         score: 0,
         totalResponseTimeMs: 0,
         answers: new Map(),
+        cheatDetected: false,
       });
       return true; // newly added
     }
@@ -220,6 +224,34 @@ module.exports = (io) => {
 
         // Start question sequence immediately
         emitQuestion(io, session, 0);
+      } catch (err) {
+        socket.emit("quiz:error", { message: err.message });
+      }
+    });
+
+    // ── quiz:cheat-detected ──────────────────────────────────────────────────
+    // Emitted by the frontend when it detects suspicious activity (e.g. tab switch).
+    // { quizId }  — marks the calling user's participant entry as cheatDetected: true.
+    socket.on("quiz:cheat-detected", ({ quizId } = {}) => {
+      try {
+        if (!quizId)
+          return socket.emit("quiz:error", { message: "quizId is required." });
+
+        const session = activeSessions.get(quizId);
+        if (!session)
+          return socket.emit("quiz:error", { message: "No active quiz session found." });
+
+        const participant = session.participants.get(socket.user.userId);
+        if (!participant)
+          return socket.emit("quiz:error", { message: "You have not joined this quiz." });
+
+        participant.cheatDetected = true;
+
+        // Notify the quiz room (host / faculty can see it live)
+        io.to(`quiz:${quizId}`).emit("quiz:cheating-flagged", {
+          quizId,
+          userId: socket.user.userId,
+        });
       } catch (err) {
         socket.emit("quiz:error", { message: err.message });
       }
@@ -406,6 +438,7 @@ async function endQuiz(io, session) {
         userId: p.userId,
         score: p.score,
         totalResponseTimeMs: p.totalResponseTimeMs,
+        cheatDetected: p.cheatDetected,
       }));
 
     // Persist to DB
@@ -428,6 +461,7 @@ async function endQuiz(io, session) {
         userId: p.userId,
         score: p.score,
         totalResponseTimeMs: p.totalResponseTimeMs,
+        cheatDetected: p.cheatDetected,
         answers: [...p.answers.entries()].map(([qIdx, ans]) => ({
           questionIndex: qIdx,
           selectedIndex: ans.selectedIndex,

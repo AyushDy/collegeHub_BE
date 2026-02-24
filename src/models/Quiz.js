@@ -22,6 +22,7 @@ const participantSchema = new mongoose.Schema(
     score: { type: Number, default: 0 },
     totalResponseTimeMs: { type: Number, default: 0 }, // tie-breaker (lower = better)
     answers: { type: [answerSchema], default: [] },
+    cheatDetected: { type: Boolean, default: false }, // flagged by frontend (e.g. tab switch)
   },
   { _id: false }
 );

@@ -66,11 +66,13 @@ GET /api/quiz/:quizId/results
     {
       quiz: { _id, title, groupId, status, startedAt, endedAt, questions[] },
       leaderboard: [
-        { rank, userId: { _id, email, role }, score, totalResponseTimeMs, answers[] },
+        { rank, userId: { _id, email, role }, score, totalResponseTimeMs,
+          cheatDetected, answers[] },
         ...
       ]
     }
     — sorted: score DESC, totalResponseTimeMs ASC (tie-breaker)
+    — cheatDetected: true if the frontend flagged that student (e.g. tab switch)
     — answers[]: { questionIndex, selectedIndex, isCorrect, responseTimeMs }
   400    : "Results are only available after the quiz has ended."
   403    : "You are not a member of this group."
@@ -127,6 +129,7 @@ GET /api/quiz/group/:groupId
       userId             ref User
       score              Number
       totalResponseTimeMs Number
+      cheatDetected      Boolean  (default false; set true via socket quiz:cheat-detected)
       answers[]
         questionIndex   Number
         selectedIndex   Number   (-1 = no answer / timeout)

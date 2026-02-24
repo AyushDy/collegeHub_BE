@@ -13,9 +13,13 @@ CLIENT → SERVER
   resolveThread{ threadId }                            [author | FACULTY | ADMIN]
   acceptReply  { replyId }                             [STUDENT — thread author]
 
-  quiz:join    { quizId }                              [ALL — group member]
-  quiz:lock    { quizId }                              [creator | FACULTY | ADMIN]
-  quiz:answer  { quizId, questionIndex, selectedIndex } [ALL — joined participant]
+  quiz:join             { quizId }                              [ALL — group member]
+  quiz:lock             { quizId }                              [creator | FACULTY | ADMIN]
+  quiz:answer           { quizId, questionIndex, selectedIndex } [ALL — joined participant]
+  quiz:cheat-detected   { quizId }                              [ALL — joined participant]
+    — emit when the frontend detects suspicious activity (e.g. tab switch / visibility change).
+    — marks the calling user's participant entry as cheatDetected: true.
+    — idempotent: safe to call multiple times.
 
 SERVER → CLIENT  (groups / threads)
   newMessage      { _id, groupId, sender, message, isEdited, createdAt }
@@ -59,9 +63,15 @@ quiz:question-result Emitted to QUIZ room after timeLimit expires (or all answer
     { quizId, questionIndex, correctIndex, optionCounts[], correctCount }
     — optionCounts is parallel to options[]; correctCount = users who got it right.
 
+quiz:cheating-flagged  Emitted to QUIZ room when a participant is flagged.
+    { quizId, userId }
+    — use this to show a live warning on the host / faculty screen.
+    — the flag is persisted and appears as cheatDetected: true in the leaderboard.
+
 quiz:ended          Emitted to QUIZ room after all questions are done.
-    { quizId, leaderboard: [ { rank, userId, score, totalResponseTimeMs }, ... ] }
+    { quizId, leaderboard: [ { rank, userId, score, totalResponseTimeMs, cheatDetected }, ... ] }
     — sorted: score DESC, totalResponseTimeMs ASC (tie-breaker).
+    — cheatDetected: true for participants flagged during the quiz.
 
 quiz:error          Emitted to the requesting socket on any quiz error.
     { message }
