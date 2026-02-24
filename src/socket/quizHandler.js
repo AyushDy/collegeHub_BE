@@ -88,6 +88,7 @@ class QuizSession {
     this.questionStats = {};
     this.creatorId = quiz.createdBy.toString();
   }
+  
 
   addParticipant(userId) {
     if (!this.participants.has(userId)) {

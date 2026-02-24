@@ -9,7 +9,11 @@ const messageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
+      default: "",   // may be empty when user sends only an image
+    },
+    imageUrl: {
+      type: String,
+      default: null, // Cloudinary URL; only set on user messages
     },
   },
   { timestamps: true }

@@ -408,13 +408,16 @@ Return ONLY valid JSON (no markdown):
 // ─── AI DOUBT CHAT ──────────────────────────────────────────────────────────────────
 
 // POST /api/ai/doubt-chat
-// Conversational AI tutor. Sends a question, gets a response.
+// Conversational AI tutor. Sends a question (and optional image), gets a response.
 // History is persisted per user and used as context on every call.
 exports.doubtChat = async (req, res) => {
   try {
     const { question } = req.body;
-    if (!question || !question.trim())
-      return res.status(400).json({ message: "question is required" });
+    const imageFile = req.file; // populated by multer-cloudinary when image is uploaded
+
+    // At least one of question or image is required
+    if ((!question || !question.trim()) && !imageFile)
+      return res.status(400).json({ message: "question or an image is required" });
 
     // Load or create session for this user
     let session = await AiDoubtChat.findOne({ userId: req.user.userId });
@@ -422,11 +425,11 @@ exports.doubtChat = async (req, res) => {
       session = await AiDoubtChat.create({ userId: req.user.userId, messages: [] });
     }
 
-    // Build Gemini history from saved messages (max last 20 turns to keep prompt small)
+    // Build Gemini history from saved messages (max last 20 turns, text-only)
     const recent = session.messages.slice(-40); // 20 pairs
     const history = recent.map((m) => ({
       role: m.role,
-      parts: [{ text: m.content }],
+      parts: [{ text: m.content || "" }],
     }));
 
     const chat = model.startChat({
@@ -436,21 +439,38 @@ exports.doubtChat = async (req, res) => {
           text: `You are CollegeHub's AI academic tutor. Help students with any academic doubt clearly and concisely.
 - Keep answers focused and structured.
 - Use examples where helpful.
-- If a question is unrelated to academics, politely redirect the student.`,
+- If a question is unrelated to academics, politely redirect the student.
+- When an image is included, analyse it carefully before answering.`,
         }],
       },
     });
 
-    const result = await chat.sendMessage(question.trim());
+    // Build current message parts (text + optional image)
+    const parts = [];
+    if (question && question.trim()) parts.push({ text: question.trim() });
+
+    if (imageFile) {
+      // imageFile.path is the Cloudinary public URL
+      const fetchRes = await fetch(imageFile.path);
+      const arrayBuffer = await fetchRes.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      parts.push({ inlineData: { mimeType: imageFile.mimetype, data: base64 } });
+    }
+
+    const result = await chat.sendMessage(parts);
     const answer = result.response.text();
 
     // Persist both turns
-    session.messages.push({ role: "user", content: question.trim() });
+    const userContent = question ? question.trim() : "";
+    const uploadedImageUrl = imageFile ? imageFile.path : null;
+
+    session.messages.push({ role: "user", content: userContent, imageUrl: uploadedImageUrl });
     session.messages.push({ role: "model", content: answer });
     await session.save();
 
     res.json({
-      question: question.trim(),
+      question: userContent || undefined,
+      imageUrl: uploadedImageUrl || undefined,
       answer,
       totalMessages: session.messages.length,
     });

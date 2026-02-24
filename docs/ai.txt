@@ -110,17 +110,24 @@ AI DOUBT CHAT
 
 Conversational AI tutor. One persistent session per user.
 History (last 40 messages) is sent as context on every call.
+Images are uploaded to Cloudinary and sent inline to Gemini; past image
+turn history is text-only (images are not re-sent on subsequent calls).
 
 POST /api/ai/doubt-chat          [ALL]
-  Body : { question(req): string }
-  200  : { question, answer, totalMessages }
-  400  : "question is required"
+  Content-Type : multipart/form-data
+  Fields (at least one required):
+    question  : string  — the doubt or question to ask
+    image     : file    — optional image (jpg/png/webp, max 5 MB)
+                          uploaded to Cloudinary folder ai_doubt_chat/
+  200  : { question?, imageUrl?, answer, totalMessages }
+  400  : "question or an image is required"
 
 GET /api/ai/doubt-chat           [ALL]
   Returns the full chat history for the authenticated user.
-  200  : { messages: [{ _id, role: user|model, content, createdAt }],
+  200  : { messages: [{ _id, role: user|model, content, imageUrl, createdAt }],
            total, updatedAt }
   (Empty session returns { messages: [], total: 0 })
+  Note: imageUrl is only present on user messages that included an image.
 
 DELETE /api/ai/doubt-chat        [ALL]
   Clears all messages from the user's chat session.

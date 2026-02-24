@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const aiController = require("../controllers/aiController");
 const { protect, authorize } = require("../middleware/authMiddleware");
+const uploadImage = require("../middleware/uploadImage");
 
 // ─── AI ROADMAP GENERATOR ──────────────────────────────────────────────────
 // POST   /api/ai/roadmap          — generate & save a new skill roadmap
@@ -42,11 +43,11 @@ router.get("/recommendations", protect, authorize("STUDENT"), aiController.getRe
 
 router.post("/study-suggestions", protect, aiController.studySuggestions);
 // ─── AI DOUBT CHAT (conversational, history persisted) ─────────────────────────
-// POST   /api/ai/doubt-chat        — ask a question, get AI answer (history-aware)
+// POST   /api/ai/doubt-chat        — ask a question (+ optional image), get AI answer
 // GET    /api/ai/doubt-chat        — fetch full chat history for current user
 // DELETE /api/ai/doubt-chat        — clear chat history
 
-router.post("/doubt-chat", protect, aiController.doubtChat);
+router.post("/doubt-chat", protect, uploadImage("ai_doubt_chat").single("image"), aiController.doubtChat);
 router.get("/doubt-chat", protect, aiController.getDoubtChat);
 router.delete("/doubt-chat", protect, aiController.clearDoubtChat);
 module.exports = router;
