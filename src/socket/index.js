@@ -58,9 +58,6 @@ module.exports = (io) => {
     // ── sendMessage ───────────────────────────────────────────────────────────
     socket.on("sendMessage", async ({ groupId, message }) => {
       try {
-        if (socket.user.role !== "STUDENT")
-          return socket.emit("error", { message: "Only students can send messages" });
-
         const member = await isMember(socket.user.userId, socket.user.role, groupId);
         if (!member)
           return socket.emit("error", { message: "You are not a member of this group" });
@@ -112,7 +109,9 @@ module.exports = (io) => {
         const msg = await GroupChatMessage.findById(messageId);
         if (!msg) return socket.emit("error", { message: "Message not found" });
 
-        if (msg.sender.toString() !== socket.user.userId)
+        const isOwner = msg.sender.toString() === socket.user.userId;
+        const isModerator = socket.user.role === "FACULTY" || socket.user.role === "ADMIN";
+        if (!isOwner && !isModerator)
           return socket.emit("error", { message: "You can only delete your own messages" });
 
         const groupId = msg.groupId.toString();
@@ -126,9 +125,6 @@ module.exports = (io) => {
     // ── createThread ──────────────────────────────────────────────────────────
     socket.on("createThread", async ({ groupId, title, content, subject }) => {
       try {
-        if (socket.user.role !== "STUDENT")
-          return socket.emit("error", { message: "Only students can create threads" });
-
         if (!groupId || !title?.trim() || !content?.trim())
           return socket.emit("error", { message: "groupId, title, and content are required" });
 

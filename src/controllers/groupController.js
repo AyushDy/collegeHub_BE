@@ -6,10 +6,19 @@ const { getStudentGroups, isMember } = require("../utils/groupMembership");
 
 // ─── GROUP ENDPOINTS ─────────────────────────────────────────────────────────
 
-// GET /api/groups/my — all groups the student belongs to, with socket room info
+// GET /api/groups/my — groups for the current user
+// Students: groups they belong to via GroupMembership
+// Faculty / Admin: all active groups (they are not stored in GroupMembership)
 exports.getMyGroup = async (req, res) => {
   try {
-    const groups = await getStudentGroups(req.user.userId);
+    let groups;
+
+    if (req.user.role === "FACULTY" || req.user.role === "ADMIN") {
+      groups = await AcademicGroup.find({ isActive: true }).sort({ branch: 1, year: 1, section: 1 });
+    } else {
+      groups = await getStudentGroups(req.user.userId);
+    }
+
     if (!groups.length)
       return res.status(404).json({ message: "No groups found. Create a profile first." });
 

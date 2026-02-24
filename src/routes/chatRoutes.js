@@ -3,8 +3,9 @@ const router = express.Router();
 const chatController = require("../controllers/chatController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
-// Edit / Delete own message (student only)
+// Edit own message (student only — faculty should not put words in students' mouths)
 router.put("/:messageId", protect, authorize("STUDENT"), chatController.editMessage);
-router.delete("/:messageId", protect, authorize("STUDENT"), chatController.deleteMessage);
+// Delete: own message (student) or any message for moderation (faculty/admin)
+router.delete("/:messageId", protect, authorize("STUDENT", "FACULTY", "ADMIN"), chatController.deleteMessage);
 
 module.exports = router;

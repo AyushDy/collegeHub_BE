@@ -24,13 +24,16 @@ exports.editMessage = async (req, res) => {
   }
 };
 
-// DELETE /api/chat/:messageId — delete own message
+// DELETE /api/chat/:messageId — delete own message (students) or any message (faculty/admin)
 exports.deleteMessage = async (req, res) => {
   try {
     const msg = await GroupChatMessage.findById(req.params.messageId);
     if (!msg) return res.status(404).json({ message: "Message not found" });
 
-    if (msg.sender.toString() !== req.user.userId)
+    const isOwner = msg.sender.toString() === req.user.userId;
+    const isModerator = req.user.role === "FACULTY" || req.user.role === "ADMIN";
+
+    if (!isOwner && !isModerator)
       return res.status(403).json({ message: "You can only delete your own messages" });
 
     await msg.deleteOne();
