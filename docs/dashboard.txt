@@ -12,6 +12,9 @@ GET /api/dashboard                         [ALL AUTHENTICATED]
   unreadNotifications    — Number (unread count)
   recentNotifications    — Array (last 5)
   upcomingEvents         — Array (next 5, with rsvpCount + userRsvpd)
+  announcements          — Static campus announcements (id, title, body, type, pinned)
+  academicCalendar       — Static semester dates (date, label)
+  platformHighlights     — Static feature highlights (title, description)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   STUDENT RESPONSE
@@ -19,6 +22,12 @@ GET /api/dashboard                         [ALL AUTHENTICATED]
   profile                — StudentProfile or null
   groups                 — Academic groups the student belongs to
   clubs                  — Clubs joined (with clubRole)
+  recentQuizScores       — Last 5 completed quizzes with scores:
+                           { _id, title, group, totalQuestions, score,
+                             totalResponseTimeMs, endedAt }
+  quickLinks             — Static student action shortcuts (label, path, icon)
+  tips                   — Array of study/productivity tips (strings)
+  trendingTopics         — Static popular topics (title, tag)
   stats:
     groupCount           — Number of academic groups
     clubCount            — Number of clubs joined
@@ -36,6 +45,8 @@ GET /api/dashboard                         [ALL AUTHENTICATED]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   clubsManaged           — Clubs where faculty is leader/co-leader (with clubRole)
   recentQuizzes          — Last 5 quizzes created (title, group, status, participantCount)
+  quickLinks             — Static faculty action shortcuts (label, path, icon)
+  tips                   — Array of teaching/engagement tips (strings)
   stats:
     totalGroups          — All active academic groups
     totalStudents        — Total student count

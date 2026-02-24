@@ -13,6 +13,80 @@ const ForumThread = require("../models/ForumThread");
 const Roadmap = require("../models/Roadmap");
 const StudyPlan = require("../models/StudyPlan");
 
+// ─── Static / dummy data sent alongside real data ────────────────────────────
+
+const COMMON_ANNOUNCEMENTS = [
+  { id: 1, title: "Welcome to CollegeHub!", body: "Explore groups, clubs, quizzes, and more. Complete your profile to get started.", type: "info", pinned: true },
+  { id: 2, title: "Mid-Semester Exams Approaching", body: "Mid-semester examinations are scheduled from the 3rd week of October. Check your department notice board for the detailed timetable.", type: "exam", pinned: false },
+  { id: 3, title: "Annual Tech Fest 2025", body: "Registrations now open for TechNova 2025! Participate in hackathons, workshops, and coding contests.", type: "event", pinned: false },
+  { id: 4, title: "Library Hours Extended", body: "The central library will remain open until 10 PM on weekdays during the exam period.", type: "info", pinned: false },
+];
+
+const ACADEMIC_CALENDAR = [
+  { date: "2025-08-01", label: "Semester Begins" },
+  { date: "2025-09-15", label: "Last Date to Drop Courses" },
+  { date: "2025-10-13", label: "Mid-Semester Exams Start" },
+  { date: "2025-10-25", label: "Mid-Semester Exams End" },
+  { date: "2025-11-01", label: "Fest Week" },
+  { date: "2025-11-25", label: "End-Semester Exams Start" },
+  { date: "2025-12-10", label: "End-Semester Exams End" },
+  { date: "2025-12-15", label: "Semester Ends" },
+];
+
+const STUDENT_QUICK_LINKS = [
+  { label: "My Profile", path: "/profile", icon: "user" },
+  { label: "My Groups", path: "/groups", icon: "users" },
+  { label: "My Clubs", path: "/clubs", icon: "star" },
+  { label: "Quizzes", path: "/quizzes", icon: "help-circle" },
+  { label: "Forums", path: "/forums", icon: "message-square" },
+  { label: "Resources", path: "/resources", icon: "book-open" },
+  { label: "Roadmaps", path: "/roadmaps", icon: "map" },
+  { label: "Study Plans", path: "/study-plans", icon: "calendar" },
+];
+
+const STUDENT_TIPS = [
+  "Use the Pomodoro technique: study 25 min, break 5 min, repeat.",
+  "Join at least one club — it boosts both skills and your resume.",
+  "Review your quiz scores weekly to track progress.",
+  "Explore AI-generated roadmaps to plan your learning path.",
+  "Upload and share resources to help your group members.",
+  "Start forum discussions to clarify doubts before exams.",
+];
+
+const STUDENT_TRENDING_TOPICS = [
+  { title: "How to prepare for placement season?", tag: "career" },
+  { title: "Best resources for Data Structures & Algorithms", tag: "academics" },
+  { title: "Tips for final year project selection", tag: "project" },
+  { title: "Internship experience sharing thread", tag: "career" },
+  { title: "Open-source contributions for beginners", tag: "tech" },
+];
+
+const FACULTY_QUICK_LINKS = [
+  { label: "Create Quiz", path: "/quizzes/create", icon: "plus-circle" },
+  { label: "Upload Resource", path: "/resources/upload", icon: "upload" },
+  { label: "Create Event", path: "/events/create", icon: "calendar" },
+  { label: "Manage Clubs", path: "/clubs", icon: "star" },
+  { label: "Discussion Threads", path: "/threads", icon: "message-circle" },
+  { label: "Forums", path: "/forums", icon: "message-square" },
+];
+
+const FACULTY_TIPS = [
+  "Schedule quizzes regularly to keep students engaged.",
+  "Use timed quizzes to simulate exam conditions.",
+  "Share resources in groups for easy student access.",
+  "Create events for workshops and guest lectures.",
+  "Encourage students to participate in forum discussions.",
+  "Review unresolved threads to address student doubts.",
+];
+
+const PLATFORM_HIGHLIGHTS = [
+  { title: "Real-Time Quizzes", description: "Create and run live quizzes with instant scoring and leaderboards." },
+  { title: "AI Study Tools", description: "Generate personalized roadmaps and study plans powered by AI." },
+  { title: "Club Management", description: "Create clubs, manage members, and organise club events." },
+  { title: "Resource Library", description: "Upload and share academic resources within groups." },
+  { title: "Discussion Forums", description: "Campus-wide forums with likes, dislikes, and threaded replies." },
+];
+
 // ─── GET /api/dashboard ──────────────────────────────────────────────────────
 // Returns a role-based data summary for the authenticated user
 exports.getDashboard = async (req, res) => {
@@ -60,6 +134,9 @@ exports.getDashboard = async (req, res) => {
       unreadNotifications,
       recentNotifications,
       upcomingEvents: upcomingEventsFormatted,
+      announcements: COMMON_ANNOUNCEMENTS,
+      academicCalendar: ACADEMIC_CALENDAR,
+      platformHighlights: PLATFORM_HIGHLIGHTS,
     };
 
     // ── STUDENT ────────────────────────────────────────────────────────────
@@ -88,13 +165,35 @@ exports.getDashboard = async (req, res) => {
         quizzesAvailable,
         quizzesParticipated,
         resourcesInGroups,
+        recentQuizResults,
       ] = await Promise.all([
         DiscussionThread.countDocuments({ groupId: { $in: groupIds }, isResolved: false }),
         DiscussionThread.countDocuments({ groupId: { $in: groupIds } }),
         Quiz.countDocuments({ groupId: { $in: groupIds }, status: { $in: ["CREATED", "RUNNING"] } }),
         Quiz.countDocuments({ groupId: { $in: groupIds }, "participants.userId": userId }),
         AcademicResource.countDocuments({ groupId: { $in: groupIds } }),
+        Quiz.find(
+          { groupId: { $in: groupIds }, "participants.userId": userId, status: "ENDED" }
+        )
+          .sort({ endedAt: -1 })
+          .limit(5)
+          .select("title groupId questions participants endedAt")
+          .populate("groupId", "name")
+          .lean(),
       ]);
+
+      const quizScores = recentQuizResults.map((q) => {
+        const entry = q.participants.find((p) => p.userId.toString() === userId.toString());
+        return {
+          _id: q._id,
+          title: q.title,
+          group: q.groupId,
+          totalQuestions: q.questions.length,
+          score: entry ? entry.score : 0,
+          totalResponseTimeMs: entry ? entry.totalResponseTimeMs : 0,
+          endedAt: q.endedAt,
+        };
+      });
 
       return res.json({
         ...base,
@@ -105,6 +204,10 @@ exports.getDashboard = async (req, res) => {
           ...m.clubId,
           clubRole: m.role,
         })),
+        recentQuizScores: quizScores,
+        quickLinks: STUDENT_QUICK_LINKS,
+        tips: STUDENT_TIPS,
+        trendingTopics: STUDENT_TRENDING_TOPICS,
         stats: {
           groupCount: groupIds.length,
           clubCount: clubMemberships.length,
@@ -168,6 +271,8 @@ exports.getDashboard = async (req, res) => {
           participantCount: q.participants.length,
           createdAt: q.createdAt,
         })),
+        quickLinks: FACULTY_QUICK_LINKS,
+        tips: FACULTY_TIPS,
         stats: {
           totalGroups,
           totalStudents,
