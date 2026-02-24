@@ -5,7 +5,7 @@ const DiscussionReply = require("../models/DiscussionReply");
 const StudentProfile = require("../models/StudentProfile");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 // Strip markdown code fences that Gemini sometimes wraps JSON in
 function parseGeminiJSON(text) {
