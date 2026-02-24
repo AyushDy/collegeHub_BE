@@ -1,55 +1,89 @@
 /**
  * Quiz Socket Handler
  *
- * Manages real-time quiz sessions driven by Socket.IO.
+ * ─── Lifecycle ───────────────────────────────────────────────────────────────
  *
- * Quiz room name: `quiz:<quizId>`
+ *  1. Creator calls  POST /api/quiz/:quizId/start  (REST)
+ *       → DB status → RUNNING
+ *       → startQuizSession() called server-side
+ *       → quiz:announced  emitted to the GROUP room
+ *       → Lobby is now open; participants can emit quiz:join
  *
- * Client → Server events:
- *   quiz:join    { quizId }                         — join a running quiz
- *   quiz:answer  { quizId, questionIndex, selectedIndex }
+ *  2. Participants emit  quiz:join  { quizId }
+ *       → Added to in-memory session
+ *       → quiz:joined  acked to the joining socket
+ *       → quiz:participant-joined  broadcast to quiz room (lobby update)
  *
- * Server → Client events:
- *   quiz:announced      { quizId, title, groupId, joinWindowMs, questionCount }
- *                       → broadcast to group room when quiz is started via REST
- *   quiz:joined         { quizId, participantCount }
- *                       → ack to the joining socket
- *   quiz:question       { quizId, questionIndex, totalQuestions, text, options, timeLimitSeconds }
- *                       → broadcast to quiz room (correctIndex NOT included)
- *   quiz:answer-ack     { quizId, questionIndex }
- *                       → ack to answering socket
- *   quiz:question-result { quizId, questionIndex, correctIndex, optionCounts, correctCount }
- *                       → broadcast to quiz room after timeout
- *   quiz:score-update   { quizId, userId, score, totalResponseTimeMs }
- *                       → broadcast to quiz room so clients can show live scores
- *   quiz:ended          { quizId, leaderboard }
- *                       → broadcast to quiz room
- *   quiz:error          { message }
- *                       → to the requesting socket only
+ *  3. Creator (or faculty/admin) emits  quiz:lock  { quizId }
+ *       → No more joins accepted
+ *       → quiz:locked  broadcast to quiz room with final participant list
+ *       → Question sequence begins immediately
+ *
+ *  4. Per question:
+ *       → quiz:question  emitted (no correctIndex)
+ *       → Participants emit  quiz:answer
+ *       → quiz:answer-ack  to answering socket
+ *       → quiz:score-update  to quiz room on every accepted answer
+ *       → When timer expires OR all answered → quiz:question-result emitted
+ *       → 3 s pause → next question
+ *
+ *  5. After last question:
+ *       → quiz:ended  emitted with leaderboard
+ *       → DB persisted (status ENDED, stats, participants)
+ *
+ * ─── Client → Server events ──────────────────────────────────────────────────
+ *   quiz:join         { quizId }
+ *   quiz:lock         { quizId }                    — creator / faculty / admin
+ *   quiz:answer       { quizId, questionIndex, selectedIndex }
+ *
+ * ─── Server → Client events ──────────────────────────────────────────────────
+ *   quiz:announced        { quizId, title, groupId, questionCount }
+ *                         → group room when REST /start is called
+ *   quiz:joined           { quizId, participantCount }
+ *                         → ack to joining socket
+ *   quiz:participant-joined { quizId, userId, participantCount }
+ *                         → quiz room — lobby live update
+ *   quiz:locked           { quizId, participantCount, participants[] }
+ *                         → quiz room — lobby closed, questions about to start
+ *   quiz:question         { quizId, questionIndex, totalQuestions, text, options[], timeLimitSeconds }
+ *                         → quiz room (correctIndex NOT included)
+ *   quiz:answer-ack       { quizId, questionIndex }
+ *                         → answering socket
+ *   quiz:score-update     { quizId, userId, score, totalResponseTimeMs }
+ *                         → quiz room
+ *   quiz:question-result  { quizId, questionIndex, correctIndex, optionCounts[], correctCount }
+ *                         → quiz room after question closes
+ *   quiz:ended            { quizId, leaderboard[] }
+ *                         → quiz room
+ *   quiz:error            { message }
+ *                         → requesting socket only
  */
 
 const Quiz = require("../models/Quiz");
 const { isMember } = require("../utils/groupMembership");
 
-const JOIN_WINDOW_MS = 10_000; // 10 s window for participants to join after quiz:announced
-const BETWEEN_QUESTIONS_MS = 3_000; // 3 s pause between question result and next question
+const BETWEEN_QUESTIONS_MS = 3_000; // pause between question-result and next question
 
 /**
  * In-memory map of active quiz sessions.
- * Key: quizId (string)
- * Value: QuizSession (see below)
+ * Key: quizId (string) — Value: QuizSession
  */
 const activeSessions = new Map();
 
 class QuizSession {
   constructor(quiz) {
-    this.quiz = quiz; // Mongoose document (re-fetched from DB as needed)
+    this.quiz = quiz;
     this.quizId = quiz._id.toString();
-    /** Map<userId string, { score, totalResponseTimeMs, answers: Map<qIdx, answer> }> */
+    /** Map<userId, { userId, score, totalResponseTimeMs, answers: Map<qIdx, answer> }> */
     this.participants = new Map();
     this.currentQuestionIndex = -1;
+    this.questionStartedAt = 0;
     this.questionTimer = null;
-    this.started = false;
+    this.questionClosed = false; // guard against double closeQuestion calls
+    this.locked = false;         // true once quiz:lock is received — no new joins
+    this.started = false;        // true once first question is emitted
+    this.questionStats = {};
+    this.creatorId = quiz.createdBy.toString();
   }
 
   addParticipant(userId) {
@@ -58,9 +92,11 @@ class QuizSession {
         userId,
         score: 0,
         totalResponseTimeMs: 0,
-        answers: new Map(), // questionIndex → { selectedIndex, isCorrect, responseTimeMs }
+        answers: new Map(),
       });
+      return true; // newly added
     }
+    return false; // already present
   }
 
   recordAnswer(userId, questionIndex, selectedIndex, responseTimeMs) {
@@ -81,33 +117,35 @@ class QuizSession {
   }
 
   isQuestionAnsweredByAll(questionIndex) {
+    if (this.participants.size === 0) return false;
     for (const [, p] of this.participants) {
       if (!p.answers.has(questionIndex)) return false;
     }
-    return this.participants.size > 0;
+    return true;
   }
 }
 
 /**
- * Main export — called in socket/index.js to register handlers per socket.
- * Also sets up the `io` reference used by `startQuizSession`.
+ * Main export — called once from socket/index.js.
  */
 module.exports = (io) => {
+
   // ─── Per-socket event registration ────────────────────────────────────────
   const registerHandlers = (socket) => {
+
     // ── quiz:join ───────────────────────────────────────────────────────────
     socket.on("quiz:join", async ({ quizId } = {}) => {
       try {
         if (!quizId)
           return socket.emit("quiz:error", { message: "quizId is required." });
 
-        // Load quiz
         const quiz = await Quiz.findById(quizId);
-        if (!quiz) return socket.emit("quiz:error", { message: "Quiz not found." });
+        if (!quiz)
+          return socket.emit("quiz:error", { message: "Quiz not found." });
         if (quiz.status === "ENDED")
           return socket.emit("quiz:error", { message: "Quiz has already ended." });
         if (quiz.status === "CREATED")
-          return socket.emit("quiz:error", { message: "Quiz has not started yet." });
+          return socket.emit("quiz:error", { message: "Quiz has not started yet. Wait for the host to open the lobby." });
 
         // Validate group membership
         const member = await isMember(
@@ -116,21 +154,72 @@ module.exports = (io) => {
           quiz.groupId.toString()
         );
         if (!member)
-          return socket.emit("quiz:error", {
-            message: "You are not a member of this group.",
-          });
+          return socket.emit("quiz:error", { message: "You are not a member of this group." });
 
-        const roomName = `quiz:${quizId}`;
-        socket.join(roomName);
-
-        // Register in session if it exists
         const session = activeSessions.get(quizId);
-        if (session) {
-          session.addParticipant(socket.user.userId);
-        }
 
-        const participantCount = session ? session.participants.size : 0;
-        socket.emit("quiz:joined", { quizId, participantCount });
+        // Lobby is locked — late join rejected
+        if (session && session.locked)
+          return socket.emit("quiz:error", { message: "Lobby is locked. The quiz has already begun." });
+
+        socket.join(`quiz:${quizId}`);
+
+        if (session) {
+          const isNew = session.addParticipant(socket.user.userId);
+          const participantCount = session.participants.size;
+
+          socket.emit("quiz:joined", { quizId, participantCount });
+
+          // Broadcast to quiz room so lobby updates for everyone (including creator)
+          if (isNew) {
+            io.to(`quiz:${quizId}`).emit("quiz:participant-joined", {
+              quizId,
+              userId: socket.user.userId,
+              participantCount,
+            });
+          }
+        } else {
+          // Session not in memory (edge: server restart between REST start and socket join)
+          socket.emit("quiz:joined", { quizId, participantCount: 0 });
+        }
+      } catch (err) {
+        socket.emit("quiz:error", { message: err.message });
+      }
+    });
+
+    // ── quiz:lock ───────────────────────────────────────────────────────────
+    // Sent by the quiz creator (or faculty/admin) to close the lobby and begin questions.
+    socket.on("quiz:lock", async ({ quizId } = {}) => {
+      try {
+        if (!quizId)
+          return socket.emit("quiz:error", { message: "quizId is required." });
+
+        const session = activeSessions.get(quizId);
+        if (!session)
+          return socket.emit("quiz:error", { message: "No active lobby found for this quiz." });
+
+        if (session.locked)
+          return socket.emit("quiz:error", { message: "Quiz is already locked and running." });
+
+        // Only the quiz creator, FACULTY, or ADMIN may lock
+        const isCreator = socket.user.userId === session.creatorId;
+        const isModerator = socket.user.role === "FACULTY" || socket.user.role === "ADMIN";
+        if (!isCreator && !isModerator)
+          return socket.emit("quiz:error", { message: "Only the quiz creator, faculty, or admin can lock the quiz." });
+
+        session.locked = true;
+
+        const participants = [...session.participants.keys()];
+
+        // Notify everyone: lobby closed, questions starting
+        io.to(`quiz:${quizId}`).emit("quiz:locked", {
+          quizId,
+          participantCount: participants.length,
+          participants,
+        });
+
+        // Start question sequence immediately
+        emitQuestion(io, session, 0);
       } catch (err) {
         socket.emit("quiz:error", { message: err.message });
       }
@@ -139,7 +228,13 @@ module.exports = (io) => {
     // ── quiz:answer ─────────────────────────────────────────────────────────
     socket.on("quiz:answer", ({ quizId, questionIndex, selectedIndex } = {}) => {
       try {
-        if (!quizId || questionIndex === undefined || selectedIndex === undefined)
+        if (
+          !quizId ||
+          questionIndex === undefined ||
+          questionIndex === null ||
+          selectedIndex === undefined ||
+          selectedIndex === null
+        )
           return socket.emit("quiz:error", {
             message: "quizId, questionIndex, and selectedIndex are required.",
           });
@@ -148,14 +243,29 @@ module.exports = (io) => {
         if (!session)
           return socket.emit("quiz:error", { message: "No active quiz session found." });
 
+        if (!session.started)
+          return socket.emit("quiz:error", { message: "Questions have not started yet." });
+
         if (session.currentQuestionIndex !== questionIndex)
           return socket.emit("quiz:error", {
             message: "Wrong question index — this question is not active.",
           });
 
         if (!session.participants.has(socket.user.userId))
+          return socket.emit("quiz:error", { message: "You have not joined this quiz." });
+
+        if (session.questionClosed)
+          return socket.emit("quiz:error", { message: "Time is up for this question." });
+
+        // selectedIndex must be a valid option index (0-based)
+        const totalOptions = session.quiz.questions[session.currentQuestionIndex]?.options?.length ?? 0;
+        if (
+          !Number.isInteger(selectedIndex) ||
+          selectedIndex < 0 ||
+          selectedIndex >= totalOptions
+        )
           return socket.emit("quiz:error", {
-            message: "You have not joined this quiz.",
+            message: `selectedIndex must be between 0 and ${totalOptions - 1}.`,
           });
 
         const responseTimeMs = Date.now() - session.questionStartedAt;
@@ -167,15 +277,12 @@ module.exports = (io) => {
         );
 
         if (result === false) {
-          // Already answered
-          return socket.emit("quiz:error", {
-            message: "You have already answered this question.",
-          });
+          return socket.emit("quiz:error", { message: "You have already answered this question." });
         }
 
         socket.emit("quiz:answer-ack", { quizId, questionIndex });
 
-        // Broadcast live score update
+        // Live score broadcast
         const participant = session.participants.get(socket.user.userId);
         io.to(`quiz:${quizId}`).emit("quiz:score-update", {
           quizId,
@@ -184,8 +291,8 @@ module.exports = (io) => {
           totalResponseTimeMs: participant.totalResponseTimeMs,
         });
 
-        // Early close — everyone answered
-        if (session.isQuestionAnsweredByAll(questionIndex)) {
+        // Early close — all participants answered
+        if (session.isQuestionAnsweredByAll(questionIndex) && !session.questionClosed) {
           clearTimeout(session.questionTimer);
           session.questionTimer = null;
           closeQuestion(io, session);
@@ -196,40 +303,33 @@ module.exports = (io) => {
     });
   };
 
-  // ─── Called from REST controller after quiz is set to RUNNING ─────────────
+  // ─── Called from REST /api/quiz/:quizId/start ──────────────────────────────
+  // Opens the lobby — questions do NOT start until creator emits quiz:lock.
   const startQuizSession = (quiz) => {
     const quizId = quiz._id.toString();
-
     if (activeSessions.has(quizId)) return; // guard against duplicate calls
 
     const session = new QuizSession(quiz);
     activeSessions.set(quizId, session);
 
-    // Announce to the group room so members know to join
+    // Announce to the GROUP room — clients should emit quiz:join to enter the lobby
     io.to(quiz.groupId.toString()).emit("quiz:announced", {
       quizId,
       title: quiz.title,
       groupId: quiz.groupId.toString(),
-      joinWindowMs: JOIN_WINDOW_MS,
       questionCount: quiz.questions.length,
+      // Lobby stays open until the creator emits quiz:lock
     });
-
-    // After JOIN_WINDOW, fire the first question
-    setTimeout(() => {
-      emitQuestion(io, session, 0);
-    }, JOIN_WINDOW_MS);
   };
 
   return { registerHandlers, startQuizSession };
 };
 
-// ─── Internal helpers (module-level, not exported) ────────────────────────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
-/**
- * Emit a question to the quiz room and set its timer.
- */
 function emitQuestion(io, session, questionIndex) {
   const quiz = session.quiz;
+
   if (questionIndex >= quiz.questions.length) {
     return endQuiz(io, session);
   }
@@ -237,8 +337,9 @@ function emitQuestion(io, session, questionIndex) {
   const q = quiz.questions[questionIndex];
   session.currentQuestionIndex = questionIndex;
   session.questionStartedAt = Date.now();
+  session.questionClosed = false;
+  session.started = true;
 
-  // Emit question WITHOUT correctIndex
   io.to(`quiz:${session.quizId}`).emit("quiz:question", {
     quizId: session.quizId,
     questionIndex,
@@ -248,21 +349,24 @@ function emitQuestion(io, session, questionIndex) {
     timeLimitSeconds: q.timeLimit,
   });
 
-  // Schedule close after timeLimit
+  // Schedule auto-close after timeLimit
   session.questionTimer = setTimeout(() => {
     session.questionTimer = null;
-    closeQuestion(io, session);
+    if (!session.questionClosed) {
+      closeQuestion(io, session);
+    }
   }, q.timeLimit * 1000);
 }
 
-/**
- * Close the current question: compute stats, emit result, move to next.
- */
 function closeQuestion(io, session) {
+  // Guard — only close once per question
+  if (session.questionClosed) return;
+  session.questionClosed = true;
+
   const questionIndex = session.currentQuestionIndex;
   const q = session.quiz.questions[questionIndex];
 
-  // Compute option counts
+  // Compute per-option selection counts
   const optionCounts = new Array(q.options.length).fill(0);
   let correctCount = 0;
 
@@ -274,11 +378,8 @@ function closeQuestion(io, session) {
     }
   }
 
-  // Persist stats in-memory on the quiz object (will be saved to DB at end)
-  if (!session.questionStats) session.questionStats = {};
   session.questionStats[questionIndex] = { optionCounts, correctCount };
 
-  // Broadcast result
   io.to(`quiz:${session.quizId}`).emit("quiz:question-result", {
     quizId: session.quizId,
     questionIndex,
@@ -287,19 +388,14 @@ function closeQuestion(io, session) {
     correctCount,
   });
 
-  // Move to next question after a brief pause
-  const nextIndex = questionIndex + 1;
+  // Pause then move to next question
   setTimeout(() => {
-    emitQuestion(io, session, nextIndex);
+    emitQuestion(io, session, questionIndex + 1);
   }, BETWEEN_QUESTIONS_MS);
 }
 
-/**
- * Finalise the quiz: build leaderboard, persist to DB, emit quiz:ended.
- */
 async function endQuiz(io, session) {
   try {
-    // Sort participants by score descending; tie-breaker: lower total response time
     const ranked = [...session.participants.values()]
       .sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
@@ -318,9 +414,8 @@ async function endQuiz(io, session) {
       quiz.status = "ENDED";
       quiz.endedAt = new Date();
 
-      // Persist per-question stats
       quiz.questions.forEach((q, idx) => {
-        const stats = session.questionStats?.[idx];
+        const stats = session.questionStats[idx];
         if (stats) {
           q.stats = {
             optionCounts: stats.optionCounts,
@@ -329,7 +424,6 @@ async function endQuiz(io, session) {
         }
       });
 
-      // Persist participant results
       quiz.participants = [...session.participants.values()].map((p) => ({
         userId: p.userId,
         score: p.score,
@@ -350,7 +444,6 @@ async function endQuiz(io, session) {
       leaderboard: ranked,
     });
 
-    // Clean up in-memory session
     activeSessions.delete(session.quizId);
   } catch (err) {
     console.error(`[quiz:endQuiz] Error ending quiz ${session.quizId}:`, err.message);

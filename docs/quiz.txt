@@ -41,9 +41,10 @@ POST /api/quiz/:quizId/start
   403    : "Only the quiz creator, faculty, or admin can start a quiz."
   404    : "Quiz not found."
 
-  Side-effect: Triggers Socket.IO quiz sequence.
-               → quiz:announced emitted to the group room
-               → 10 s join window, then questions begin sequentially.
+  Side-effect: Opens the lobby via Socket.IO.
+               → quiz:announced emitted to the group room (no timer).
+               → Participants join with quiz:join.
+               → Creator emits quiz:lock to close the lobby and begin questions.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   METADATA
@@ -96,10 +97,13 @@ GET /api/quiz/group/:groupId
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   QUIZ STATUS LIFECYCLE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  CREATED  →  POST /:quizId/start  →  RUNNING  →  (all questions done)  →  ENDED
+  CREATED  →  POST /:quizId/start  →  RUNNING (lobby open)
+           →  socket quiz:lock     →  RUNNING (questions live)
+           →  (all questions done) →  ENDED
 
   CREATED  : quiz visible, not joinable via socket
-  RUNNING  : join window open, questions emitting
+  RUNNING  : lobby open — participants join with quiz:join
+             creator/faculty/admin emit quiz:lock to begin questions
   ENDED    : read-only; results and correctIndexes exposed
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

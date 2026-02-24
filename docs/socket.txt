@@ -14,6 +14,7 @@ CLIENT → SERVER
   acceptReply  { replyId }                             [STUDENT — thread author]
 
   quiz:join    { quizId }                              [ALL — group member]
+  quiz:lock    { quizId }                              [creator | FACULTY | ADMIN]
   quiz:answer  { quizId, questionIndex, selectedIndex } [ALL — joined participant]
 
 SERVER → CLIENT  (groups / threads)
@@ -27,11 +28,20 @@ SERVER → CLIENT  (groups / threads)
   QUIZ EVENTS  (room: quiz:<quizId>)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 quiz:announced      Emitted to GROUP room when POST /api/quiz/:id/start is called.
-    { quizId, title, groupId, joinWindowMs, questionCount }
-    — clients should emit quiz:join within the join window (default 10 s).
+    { quizId, title, groupId, questionCount }
+    — clients should emit quiz:join to enter the lobby.
+    — lobby stays open until the creator emits quiz:lock.
 
 quiz:joined         Ack to the socket that emitted quiz:join.
     { quizId, participantCount }
+
+quiz:participant-joined  Emitted to QUIZ room whenever a new participant joins.
+    { quizId, userId, participantCount }
+    — use this to update the live lobby list on the creator's screen.
+
+quiz:locked         Emitted to QUIZ room when the creator locks the lobby.
+    { quizId, participantCount, participants[] }
+    — no more joins accepted after this; first question emits immediately.
 
 quiz:question       Emitted to QUIZ room for each question (NO correctIndex).
     { quizId, questionIndex, totalQuestions, text, options[], timeLimitSeconds }
@@ -43,7 +53,7 @@ quiz:answer-ack     Ack to the socket whose answer was accepted.
 
 quiz:score-update   Emitted to QUIZ room after each accepted answer.
     { quizId, userId, score, totalResponseTimeMs }
-    — use to render a live score panel.
+    — use this to render a live score panel.
 
 quiz:question-result Emitted to QUIZ room after timeLimit expires (or all answered).
     { quizId, questionIndex, correctIndex, optionCounts[], correctCount }

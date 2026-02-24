@@ -114,6 +114,8 @@ const quizSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-
+quizSchema.index({ groupId: 1, createdAt: -1 });
+quizSchema.index({ createdBy: 1 });
+quizSchema.index({ status: 1 });
 
 module.exports = mongoose.model("Quiz", quizSchema);
