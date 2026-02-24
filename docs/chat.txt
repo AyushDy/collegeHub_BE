@@ -1,6 +1,15 @@
-CHAT  —  /api/chat  (edit / delete own messages)
+CHAT  —  /api/chat  (upload / edit / delete own messages)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-All routes: protect + authorize("STUDENT"). Sender ownership enforced.
+All routes: protect. Sender ownership enforced on edit/delete.
+
+POST /api/chat/upload-image
+  Roles : ALL (protect)
+  Body  : multipart/form-data — field "image" (JPEG/PNG/WebP, max 5 MB)
+  200   : { url: "<cloudinary-url>" }
+  400   : "No image provided"
+
+  Returns a Cloudinary URL. Use this URL as the "image" field
+  when sending a chat message via Socket.IO.
 
 PUT /api/chat/:messageId
   Body : { message }

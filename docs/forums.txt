@@ -40,7 +40,7 @@ Auth: any authenticated user
 
 Query params (all optional):
   topic    partial match, case-insensitive
-  search   full-text search on title, topic, tags
+  search   substring match on title, topic, tags (case-insensitive)
   mine     "true" — only forums created by me
   page     default 1
   limit    default 20, max 50
@@ -73,6 +73,19 @@ DELETE /api/forums/:forumId
 Auth: creator, FACULTY, or ADMIN (soft-delete)
 
 Success 200: { "message": "Forum deleted" }
+
+─── EDIT FORUM ─────────────────────────────
+PUT /api/forums/:forumId
+Auth: forum creator only
+
+Body (JSON — all fields optional, at least one required):
+  title        string, max 200 (cannot be empty)
+  description  string, max 2000
+  topic        string, max 100
+  tags         comma-separated string or JSON array
+
+Success 200: { ...forum, isEdited: true }
+403: "You can only edit your own forums"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   REPLY ENDPOINTS
@@ -109,14 +122,37 @@ Success 200:
 }
 
 Replies returned in chronological order (oldest first).
+Only top-level replies are returned (parentReplyId = null).
+Each reply includes a childCount field for nested reply count.
 
 ─── ADD REPLY ──────────────────────────────
 POST /api/forums/:forumId/replies
 Auth: any authenticated user
 
-Body: { "content": "..." }
+Body: { "content": "...", "parentReplyId": "..." (optional) }
+
+Send parentReplyId to reply to an existing reply (nested).
+Omit it for a top-level reply.
 
 Success 201: { ...reply, likesCount: 0, dislikesCount: 0, userLiked: false, userDisliked: false }
+
+─── GET CHILD REPLIES ──────────────────────
+GET /api/forums/replies/:replyId/children
+Auth: any authenticated user
+
+Query params:
+  page    default 1
+  limit   default 50, max 100
+
+Success 200:
+{
+  "children": [ { ...reply, likesCount, dislikesCount, userLiked, userDisliked } ],
+  "page": 1,
+  "pages": 1,
+  "total": 4
+}
+
+Returns child replies for a given parent reply, chronological order.
 
 ─── EDIT REPLY ─────────────────────────────
 PUT /api/forums/replies/:replyId

@@ -133,8 +133,8 @@ exports.filterProfiles = async (req, res) => {
     const filter = { isActive: true };
 
     if (year) filter.year = Number(year);
-    if (section) filter.section = section.toUpperCase();
-    if (branch) filter.branch = { $regex: new RegExp(branch, "i") };
+    if (section) filter.section = { $regex: section, $options: "i" };
+    if (branch) filter.branch = { $regex: branch, $options: "i" };
 
     const profiles = await StudentProfile.find(filter)
       .populate("userId", "email role")

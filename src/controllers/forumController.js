@@ -36,7 +36,10 @@ exports.listForums = async (req, res) => {
 
     const filter = { isActive: true };
     if (topic) filter.topic = { $regex: topic, $options: "i" };
-    if (search) filter.$text = { $search: search };
+    if (search) {
+      const re = { $regex: search, $options: "i" };
+      filter.$or = [{ title: re }, { topic: re }, { tags: re }];
+    }
     if (mine === "true") filter.createdBy = req.user.userId;
 
     const skip = (Math.max(Number(page), 1) - 1) * Math.min(Number(limit), 50);

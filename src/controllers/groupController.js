@@ -42,12 +42,16 @@ exports.getMyGroup = async (req, res) => {
 // GET /api/groups — list all groups with optional filters (admin/faculty)
 exports.listGroups = async (req, res) => {
   try {
-    const { branch, year, section, type } = req.query;
+    const { branch, year, section, type, search } = req.query;
     const filter = { isActive: true };
-    if (branch) filter.branch = branch.toUpperCase();
+    if (branch) filter.branch = { $regex: branch, $options: "i" };
     if (year) filter.year = Number(year);
-    if (section) filter.section = section.toUpperCase();
+    if (section) filter.section = { $regex: section, $options: "i" };
     if (type) filter.type = type.toUpperCase();
+    if (search) {
+      const re = { $regex: search, $options: "i" };
+      filter.$or = [{ name: re }, { branch: re }];
+    }
 
     const groups = await AcademicGroup.find(filter).sort({ branch: 1, year: 1, section: 1 });
     res.json({ count: groups.length, groups });

@@ -91,7 +91,10 @@ exports.list = async (req, res) => {
     if (type && VALID_TYPES.includes(type)) filter.type = type;
     if (subject) filter.subject = { $regex: subject, $options: "i" };
     if (examYear) filter.examYear = examYear;
-    if (search) filter.$text = { $search: search };
+    if (search) {
+      const re = { $regex: search, $options: "i" };
+      filter.$or = [{ title: re }, { subject: re }, { tags: re }];
+    }
 
     const skip = (Math.max(Number(page), 1) - 1) * Math.min(Number(limit), 50);
     const lim = Math.min(Number(limit) || 20, 50);

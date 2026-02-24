@@ -21,3 +21,14 @@ GET /api/auth/me
 POST /api/auth/logout
   Roles : public
   200   : Clears-Cookie: token  |  { message: "Logged out" }
+
+PATCH /api/auth/profile-picture
+  Roles : ALL (protect)
+  Body  : multipart/form-data — field "image" (JPEG/PNG/WebP, max 5 MB)
+  200   : { message: "Profile picture updated", profilePicture: "<cloudinary-url>" }
+  400   : "No image provided"
+
+DELETE /api/auth/profile-picture
+  Roles : ALL (protect)
+  200   : { message: "Profile picture removed" }
+  400   : "No profile picture to remove"

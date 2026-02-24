@@ -140,9 +140,10 @@ exports.listEvents = async (req, res) => {
       filter.date = { $gte: new Date() };
     }
 
-    // Text search
+    // Substring search
     if (req.query.search) {
-      filter.$text = { $search: req.query.search };
+      const re = { $regex: req.query.search, $options: "i" };
+      filter.$or = [{ title: re }, { tags: re }];
     }
 
     const [events, total] = await Promise.all([

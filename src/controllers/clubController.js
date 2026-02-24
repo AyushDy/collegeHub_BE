@@ -57,7 +57,8 @@ exports.listClubs = async (req, res) => {
     }
 
     if (req.query.search) {
-      filter.$text = { $search: req.query.search };
+      const re = { $regex: req.query.search, $options: "i" };
+      filter.$or = [{ name: re }, { tags: re }, { description: re }];
     }
 
     const [clubs, total] = await Promise.all([

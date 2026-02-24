@@ -96,8 +96,10 @@ Errors:
   GET    /api/forums                             ✓     ✓     ✓
   GET    /api/forums/:forumId                    ✓     ✓     ✓
   DELETE /api/forums/:forumId                    ✓*    ✓     ✓
+  PUT    /api/forums/:forumId                    ✓*
   GET    /api/forums/:forumId/replies            ✓     ✓     ✓
   POST   /api/forums/:forumId/replies            ✓     ✓     ✓
+  GET    /api/forums/replies/:replyId/children   ✓     ✓     ✓
   PUT    /api/forums/replies/:replyId            ✓*
   DELETE /api/forums/replies/:replyId            ✓*    ✓     ✓
   PATCH  /api/forums/:forumId/like               ✓     ✓     ✓
@@ -130,6 +132,8 @@ Errors:
   * /api/quiz/:quizId/start — creator (any role), FACULTY, or ADMIN
   * DELETE /api/resources/:resourceId — uploader, FACULTY, or ADMIN
   * DELETE /api/forums/:forumId — creator, FACULTY, or ADMIN
+  * PUT /api/forums/:forumId — creator only
+  * PUT /api/forums/replies/:replyId — author only
   * PATCH/DELETE /api/events/:eventId — organizer or ADMIN
   * PATCH/DELETE /api/clubs/:clubId — club leader/co-leader or ADMIN
   * PATCH/DELETE /api/clubs/:clubId/members — leader/co-leader or ADMIN
