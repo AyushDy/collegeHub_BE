@@ -61,7 +61,7 @@ const questionSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 5,
-      max: 300,
+      max: 600,
     },
     // Filled in after question closes
     stats: { type: questionStatsSchema, default: () => ({}) },

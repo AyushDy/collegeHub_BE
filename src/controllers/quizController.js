@@ -67,9 +67,9 @@ exports.createQuiz = async (req, res) => {
         });
       if (q.timeLimit === undefined || q.timeLimit === null)
         return res.status(400).json({ message: `Question ${i + 1}: timeLimit is required.` });
-      if (!Number.isInteger(q.timeLimit) || q.timeLimit < 5 || q.timeLimit > 300)
+      if (!Number.isInteger(q.timeLimit) || q.timeLimit < 5 || q.timeLimit > 600)
         return res.status(400).json({
-          message: `Question ${i + 1}: timeLimit must be an integer between 5 and 300 seconds.`,
+          message: `Question ${i + 1}: timeLimit must be an integer between 5 and 600 seconds.`,
         });
     }
 
