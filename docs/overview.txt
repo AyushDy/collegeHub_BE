@@ -32,6 +32,7 @@ Errors:
   ai.txt             — /api/ai
   quiz.txt           — /api/quiz
   notifications.txt  — /api/notifications
+  resources.txt      — /api/resources
   socket.txt         — Socket.IO events (groups, threads, quiz)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -82,6 +83,12 @@ Errors:
   GET    /api/notifications/unread-count      ✓     ✓     ✓
   PATCH  /api/notifications/read-all          ✓     ✓     ✓
   PATCH  /api/notifications/:id/read          ✓     ✓     ✓
+  POST   /api/resources/upload                        ✓     ✓
+  GET    /api/resources/group/:groupId          ✓     ✓     ✓
+  GET    /api/resources/:resourceId             ✓     ✓     ✓
+  GET    /api/resources/:resourceId/download    ✓     ✓     ✓
+  DELETE /api/resources/:resourceId             ✓*    ✓     ✓
   ─────────────────────────────────────────────────────────
   * ownership enforced in controller (thread author only)
   * /api/quiz/:quizId/start — creator (any role), FACULTY, or ADMIN
+  * DELETE /api/resources/:resourceId — uploader, FACULTY, or ADMIN

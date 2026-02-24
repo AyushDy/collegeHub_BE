@@ -1,0 +1,128 @@
+ACADEMIC RESOURCES — /api/resources
+Syllabus uploads, PYQ repository, and lecture notes.
+All protected (cookie required). Upload restricted to FACULTY / ADMIN.
+Files: PDF only, max 2 MB.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  UPLOAD RESOURCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+POST /api/resources/upload
+Auth: FACULTY, ADMIN
+Content-Type: multipart/form-data
+
+Form fields:
+  file        (required)  PDF file, max 2 MB
+  type        (required)  "SYLLABUS" | "PYQ" | "LECTURE_NOTE"
+  groupId     (required)  target academic group ObjectId
+  title       (required)  string, max 200 chars
+  description (optional)  string, max 500 chars
+  subject     (optional)  string, max 100 chars — default "General"
+  examYear    (optional)  string, max 20 chars — only stored for PYQ type
+  tags        (optional)  comma-separated string OR JSON array of strings
+
+Success 201:
+{
+  "_id": "...",
+  "type": "SYLLABUS",
+  "groupId": { "_id": "...", "name": "...", "branch": "...", "year": 3, "section": "A", "type": "YEAR_SECTION" },
+  "title": "Data Structures Syllabus",
+  "description": "Full syllabus for DS course",
+  "subject": "Data Structures",
+  "examYear": null,
+  "fileName": "ds-syllabus.pdf",
+  "fileSize": 204800,
+  "mimeType": "application/pdf",
+  "uploadedBy": { "_id": "...", "name": "Prof. X", "email": "...", "role": "FACULTY" },
+  "tags": ["ds", "syllabus"],
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+
+Errors:
+  400  type / groupId / title / file missing or invalid
+  404  group not found
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LIST RESOURCES FOR A GROUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET /api/resources/group/:groupId
+Auth: any authenticated member (STUDENT checks membership, FACULTY/ADMIN pass)
+
+Query params (all optional):
+  type       "SYLLABUS" | "PYQ" | "LECTURE_NOTE"
+  subject    partial match, case-insensitive
+  examYear   exact match (e.g. "2024")
+  search     full-text search on title, subject, tags
+  page       default 1
+  limit      default 20, max 50
+
+Success 200:
+{
+  "resources": [ { ...resource without filePath } ],
+  "page": 1,
+  "pages": 3,
+  "total": 54
+}
+
+Errors:
+  403  not a member of the group
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GET SINGLE RESOURCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET /api/resources/:resourceId
+Auth: any authenticated member
+
+Success 200:
+{
+  "_id": "...",
+  "type": "PYQ",
+  "groupId": { ... },
+  "title": "OS Mid-Term 2024",
+  "description": "",
+  "subject": "Operating Systems",
+  "examYear": "2024-Mid",
+  "fileName": "os-mid-2024.pdf",
+  "fileSize": 158720,
+  "mimeType": "application/pdf",
+  "uploadedBy": { ... },
+  "tags": [],
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+
+Errors:
+  403  not a member
+  404  resource not found
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DOWNLOAD RESOURCE FILE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET /api/resources/:resourceId/download
+Auth: any authenticated member
+
+Streams the PDF with Content-Disposition: attachment.
+
+Success 200: binary PDF stream
+Headers:
+  Content-Disposition: attachment; filename="os-mid-2024.pdf"
+  Content-Type: application/pdf
+
+Errors:
+  403  not a member
+  404  resource or file not found
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DELETE RESOURCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DELETE /api/resources/:resourceId
+Auth: uploader (owner), or any FACULTY / ADMIN
+
+Deletes DB record and removes physical file from server.
+
+Success 200:
+{ "message": "Resource deleted" }
+
+Errors:
+  403  not owner and not FACULTY/ADMIN
+  404  resource not found
