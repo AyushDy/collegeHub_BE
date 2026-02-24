@@ -55,6 +55,13 @@ module.exports = (io) => {
       }
     });
 
+    // ── leaveGroup ────────────────────────────────────────────────────────────
+    socket.on("leaveGroup", ({ groupId }) => {
+      if (groupId) {
+        socket.leave(groupId);
+      }
+    });
+
     // ── sendMessage ───────────────────────────────────────────────────────────
     socket.on("sendMessage", async ({ groupId, message }) => {
       try {
