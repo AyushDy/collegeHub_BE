@@ -103,3 +103,25 @@ POST /api/ai/study-suggestions   [ALL]
              milestones[], motivationalTip
            }}
   400  : "weakSubjects array is required"
+
+──────────────────────────────────────────
+AI DOUBT CHAT
+──────────────────────────────────────────
+
+Conversational AI tutor. One persistent session per user.
+History (last 40 messages) is sent as context on every call.
+
+POST /api/ai/doubt-chat          [ALL]
+  Body : { question(req): string }
+  200  : { question, answer, totalMessages }
+  400  : "question is required"
+
+GET /api/ai/doubt-chat           [ALL]
+  Returns the full chat history for the authenticated user.
+  200  : { messages: [{ _id, role: user|model, content, createdAt }],
+           total, updatedAt }
+  (Empty session returns { messages: [], total: 0 })
+
+DELETE /api/ai/doubt-chat        [ALL]
+  Clears all messages from the user's chat session.
+  200  : { message: "Chat history cleared" }

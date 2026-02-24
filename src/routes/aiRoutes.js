@@ -41,5 +41,12 @@ router.get("/recommendations", protect, authorize("STUDENT"), aiController.getRe
 // Body: { weakSubjects, strongSubjects?, recentScores?, goals? }
 
 router.post("/study-suggestions", protect, aiController.studySuggestions);
+// ─── AI DOUBT CHAT (conversational, history persisted) ─────────────────────────
+// POST   /api/ai/doubt-chat        — ask a question, get AI answer (history-aware)
+// GET    /api/ai/doubt-chat        — fetch full chat history for current user
+// DELETE /api/ai/doubt-chat        — clear chat history
 
+router.post("/doubt-chat", protect, aiController.doubtChat);
+router.get("/doubt-chat", protect, aiController.getDoubtChat);
+router.delete("/doubt-chat", protect, aiController.clearDoubtChat);
 module.exports = router;

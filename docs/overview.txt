@@ -79,6 +79,9 @@ Errors:
   POST   /api/ai/doubt-assist/:threadId       ✓     ✓     ✓
   GET    /api/ai/recommendations              ✓
   POST   /api/ai/study-suggestions            ✓     ✓     ✓
+  POST   /api/ai/doubt-chat                   ✓     ✓     ✓
+  GET    /api/ai/doubt-chat                   ✓     ✓     ✓
+  DELETE /api/ai/doubt-chat                   ✓     ✓     ✓
   POST   /api/quiz                            ✓     ✓     ✓
   POST   /api/quiz/:quizId/start              ✓*    ✓     ✓
   GET    /api/quiz/:quizId                    ✓     ✓     ✓

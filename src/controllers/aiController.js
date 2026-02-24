@@ -4,6 +4,7 @@ const StudyPlan = require("../models/StudyPlan");
 const DiscussionThread = require("../models/DiscussionThread");
 const DiscussionReply = require("../models/DiscussionReply");
 const StudentProfile = require("../models/StudentProfile");
+const AiDoubtChat = require("../models/AiDoubtChat");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -399,6 +400,91 @@ Return ONLY valid JSON (no markdown):
     const suggestions = parseGeminiJSON(text);
 
     res.json({ message: "Study suggestions generated", suggestions });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ─── AI DOUBT CHAT ──────────────────────────────────────────────────────────────────
+
+// POST /api/ai/doubt-chat
+// Conversational AI tutor. Sends a question, gets a response.
+// History is persisted per user and used as context on every call.
+exports.doubtChat = async (req, res) => {
+  try {
+    const { question } = req.body;
+    if (!question || !question.trim())
+      return res.status(400).json({ message: "question is required" });
+
+    // Load or create session for this user
+    let session = await AiDoubtChat.findOne({ userId: req.user.userId });
+    if (!session) {
+      session = await AiDoubtChat.create({ userId: req.user.userId, messages: [] });
+    }
+
+    // Build Gemini history from saved messages (max last 20 turns to keep prompt small)
+    const recent = session.messages.slice(-40); // 20 pairs
+    const history = recent.map((m) => ({
+      role: m.role,
+      parts: [{ text: m.content }],
+    }));
+
+    const chat = model.startChat({
+      history,
+      systemInstruction: {
+        parts: [{
+          text: `You are CollegeHub's AI academic tutor. Help students with any academic doubt clearly and concisely.
+- Keep answers focused and structured.
+- Use examples where helpful.
+- If a question is unrelated to academics, politely redirect the student.`,
+        }],
+      },
+    });
+
+    const result = await chat.sendMessage(question.trim());
+    const answer = result.response.text();
+
+    // Persist both turns
+    session.messages.push({ role: "user", content: question.trim() });
+    session.messages.push({ role: "model", content: answer });
+    await session.save();
+
+    res.json({
+      question: question.trim(),
+      answer,
+      totalMessages: session.messages.length,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /api/ai/doubt-chat
+// Retrieve the authenticated user's full AI doubt chat history.
+exports.getDoubtChat = async (req, res) => {
+  try {
+    const session = await AiDoubtChat.findOne({ userId: req.user.userId }).lean();
+    if (!session) return res.json({ messages: [], total: 0 });
+
+    res.json({
+      messages: session.messages,
+      total: session.messages.length,
+      updatedAt: session.updatedAt,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// DELETE /api/ai/doubt-chat
+// Clear the authenticated user's AI doubt chat history.
+exports.clearDoubtChat = async (req, res) => {
+  try {
+    await AiDoubtChat.findOneAndUpdate(
+      { userId: req.user.userId },
+      { $set: { messages: [] } }
+    );
+    res.json({ message: "Chat history cleared" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

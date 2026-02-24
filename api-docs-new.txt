@@ -1,1197 +1,257 @@
-================================================================================
-  COLLEGEHUB BACKEND — API DOCUMENTATION
-  Base URL: http://localhost:5000
-================================================================================
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  AUTHENTICATION MECHANISM
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-All protected endpoints use cookie-based JWT authentication. No Authorization
-header is needed.
-
-Cookie name : token
-Cookie flags: HttpOnly | Secure (production) | SameSite=Strict | MaxAge=7d
-
-The cookie is automatically set on /register and /login, and cleared on /logout.
-Every request to a protected route must include the cookie (credentials: true).
-
-Middleware:
-  protect      — verifies the JWT from req.cookies.token; injects req.user
-                  { userId: ObjectId, role: "ADMIN"|"FACULTY"|"STUDENT" }
-  authorize()  — role guard; must follow protect in the chain
-
-Error responses from middleware:
-  401  { "message": "Not authorized" }          — cookie missing
-  401  { "message": "Token invalid" }           — bad / expired token
-  403  { "message": "Access denied" }           — role not permitted
-
-
-================================================================================
-  1. AUTH  —  /api/auth
+﻿================================================================================
+  COLLEGEHUB — WHAT WE BUILT
+  A smart academic platform for college students and faculty
 ================================================================================
 
-────────────────────────────────────────────────────────────────────────────────
-POST /api/auth/register
-────────────────────────────────────────────────────────────────────────────────
-Middleware : none
-Roles      : public
-
-Request body (JSON):
-  {
-    "email"    : "string  — required, unique",
-    "password" : "string  — required, plain text (hashed server-side)",
-    "role"     : "string  — required, one of: ADMIN | FACULTY | STUDENT"
-  }
-
-Success 201:
-  Sets-Cookie: token=<jwt>; HttpOnly; ...
-  {
-    "message": "User created",
-    "user": {
-      "id"   : "<ObjectId>",
-      "email": "user@example.com",
-      "role" : "STUDENT"
-    }
-  }
-
-Errors:
-  400  { "message": "User already exists" }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/auth/login
-────────────────────────────────────────────────────────────────────────────────
-Middleware : none
-Roles      : public
-
-Request body (JSON):
-  {
-    "email"    : "string — required",
-    "password" : "string — required"
-  }
-
-Success 200:
-  Sets-Cookie: token=<jwt>; HttpOnly; ...
-  {
-    "message": "Logged in",
-    "user": {
-      "id"   : "<ObjectId>",
-      "email": "user@example.com",
-      "role" : "STUDENT"
-    }
-  }
-
-Errors:
-  400  { "message": "Invalid credentials" }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/auth/me
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-
-Request body : none
-
-Success 200:
-  {
-    "user": {
-      "_id"      : "<ObjectId>",
-      "email"    : "user@example.com",
-      "role"     : "STUDENT",
-      "createdAt": "ISO date",
-      "updatedAt": "ISO date"
-    }
-  }
-
-Errors:
-  401  { "message": "Not authorized" }
-  404  { "message": "User not found" }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/auth/logout
-────────────────────────────────────────────────────────────────────────────────
-Middleware : none
-Roles      : public (cookie cleared regardless)
-
-Request body : none
-
-Success 200:
-  Clears-Cookie: token
-  {
-    "message": "Logged out"
-  }
-
-
-================================================================================
-  2. PROFILE  —  /api/profile
-================================================================================
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/profile
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only
-Note       : Can only be called once per user. Also auto-creates YEAR and
-             YEAR_SECTION academic groups and enrols the student in both.
-
-Request body (JSON):
-  {
-    "branch"       : "string  — required (e.g. 'CSE')",
-    "year"         : "number  — required, 1–4",
-    "section"      : "string  — required, single uppercase letter (e.g. 'A')",
-    "rollNumber"   : "string  — required",
-    "skills"       : ["string", ...]   — optional, default []",
-    "interests"    : ["string", ...]   — optional, default []",
-    "resumeLink"   : "string  — optional, must be a valid google drive URL",
-    "portfolioLink": "string  — optional, must be a valid google drive URL"
-  }
-
-Success 201:
-  {
-    "message": "Profile created",
-    "profile": {
-      "_id"          : "<ObjectId>",
-      "userId"       : "<ObjectId>",
-      "branch"       : "CSE",
-      "year"         : 2,
-      "section"      : "A",
-      "rollNumber"   : "22CSE001",
-      "skills"       : ["JavaScript", "Node.js"],
-      "interests"    : ["Web Dev"],
-      "resumeLink"   : "https://drive.google.com/...",
-      "portfolioLink": "https://drive.google.com/...",
-      "isActive"     : true,
-      "createdAt"    : "ISO date",
-      "updatedAt"    : "ISO date"
-    }
-  }
-
-Errors:
-  400  { "message": "Profile already exists" }
-  400  { "error": "<ValidationError details>" }
-  401  Not authorized / Token invalid
-  403  Access denied (non-STUDENT)
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/profile/me
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only
-
-Request body : none
-
-Success 200:
-  {
-    "profile": {
-      "_id"          : "<ObjectId>",
-      "userId"       : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-      "branch"       : "CSE",
-      "year"         : 2,
-      "section"      : "A",
-      "rollNumber"   : "22CSE001",
-      "skills"       : ["JavaScript"],
-      "interests"    : ["Web Dev"],
-      "resumeLink"   : null,
-      "portfolioLink": null,
-      "isActive"     : true,
-      "createdAt"    : "ISO date",
-      "updatedAt"    : "ISO date"
-    }
-  }
-
-Errors:
-  404  { "message": "Profile not found. Please create one." }
-  401 / 403  (middleware)
-
-────────────────────────────────────────────────────────────────────────────────
-PUT /api/profile
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only
-Note       : Only the authenticated student's own profile is updated.
-             Allowed fields: branch, year, section, rollNumber,
-                             skills, interests, resumeLink, portfolioLink
-
-Request body (JSON) — send only the fields you want to change:
-  {
-    "branch"       : "string  — optional",
-    "year"         : "number  — optional, 1–4",
-    "section"      : "string  — optional, single uppercase letter",
-    "rollNumber"   : "string  — optional",
-    "skills"       : ["string", ...]  — optional",
-    "interests"    : ["string", ...]  — optional",
-    "resumeLink"   : "string  — optional, google drive URL",
-    "portfolioLink": "string  — optional, google drive URL"
-  }
-
-Success 200:
-  {
-    "message": "Profile updated",
-    "profile": { ...same shape as POST /api/profile response }
-  }
-
-Errors:
-  400  { "error": "<ValidationError details>" }
-  404  { "message": "Profile not found" }
-  401 / 403  (middleware)
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/profile/filter
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("FACULTY", "ADMIN")  (requires cookie: token)
-Roles      : FACULTY | ADMIN
-
-Query params (all optional):
-  year    — number  (e.g. ?year=2)
-  section — string  (e.g. ?section=A)
-  branch  — string, case-insensitive regex  (e.g. ?branch=cse)
-
-Success 200:
-  {
-    "count": 30,
-    "profiles": [
-      {
-        "_id"          : "<ObjectId>",
-        "userId"       : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-        "branch"       : "CSE",
-        "year"         : 2,
-        "section"      : "A",
-        "rollNumber"   : "22CSE001",
-        "skills"       : [...],
-        "interests"    : [...],
-        "resumeLink"   : null,
-        "portfolioLink": null,
-        "isActive"     : true
-      },
-      ...
-    ]
-  }
-
-Errors:
-  401 / 403  (middleware)
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/profile/view/:id
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("FACULTY", "ADMIN")  (requires cookie: token)
-Roles      : FACULTY | ADMIN
-
-Path param:
-  id — StudentProfile ObjectId
-
-Success 200:
-  {
-    "profile": { ...full profile object with populated userId }
-  }
-
-Errors:
-  404  { "message": "Profile not found" }
-  401 / 403  (middleware)
-
-
-================================================================================
-  3. GROUPS  —  /api/groups
-================================================================================
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/groups/my
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only
-
-Request body : none
-
-Success 200:
-  {
-    "groups": [
-      {
-        "_id"        : "<ObjectId>",
-        "name"       : "CSE-2",
-        "type"       : "YEAR",
-        "branch"     : "CSE",
-        "year"       : 2,
-        "section"    : null,
-        "isActive"   : true,
-        "socketRoom" : "<ObjectId>  — use for socket.emit('joinGroup', { groupId })"
-      },
-      {
-        "_id"        : "<ObjectId>",
-        "name"       : "CSE-2-A",
-        "type"       : "YEAR_SECTION",
-        "branch"     : "CSE",
-        "year"       : 2,
-        "section"    : "A",
-        "isActive"   : true,
-        "socketRoom" : "<ObjectId>"
-      }
-    ]
-  }
-
-Errors:
-  404  { "message": "No groups found. Create a profile first." }
-  401 / 403  (middleware)
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/groups
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("ADMIN", "FACULTY")  (requires cookie: token)
-Roles      : ADMIN | FACULTY
-
-Query params (all optional):
-  branch  — string, uppercase (e.g. ?branch=CSE)
-  year    — number  (e.g. ?year=2)
-  section — string, uppercase (e.g. ?section=A)
-  type    — string, YEAR | YEAR_SECTION
-
-Success 200:
-  {
-    "count": 6,
-    "groups": [
-      {
-        "_id"     : "<ObjectId>",
-        "name"    : "CSE-2-A",
-        "branch"  : "CSE",
-        "year"    : 2,
-        "section" : "A",
-        "type"    : "YEAR_SECTION",
-        "isActive": true,
-        "createdAt": "ISO date",
-        "updatedAt": "ISO date"
-      },
-      ...
-    ]
-  }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/groups/:groupId/members
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("ADMIN", "FACULTY")  (requires cookie: token)
-Roles      : ADMIN | FACULTY
-
-Path param:
-  groupId — AcademicGroup ObjectId
-
-Success 200:
-  {
-    "groupName": "CSE-2-A",
-    "count": 60,
-    "members": [
-      {
-        "_id"          : "<ObjectId>",
-        "userId"       : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-        "branch"       : "CSE",
-        "year"         : 2,
-        "section"      : "A",
-        "rollNumber"   : "22CSE001",
-        "skills"       : [...],
-        "interests"    : [...],
-        "isActive"     : true
-      },
-      ...
-    ]
-  }
-
-Errors:
-  404  { "message": "Group not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/groups/:groupId/open
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
-             (requires cookie: token)
-Roles      : STUDENT | FACULTY | ADMIN
-             Students are only allowed if they are a member of the group.
-
-Path param:
-  groupId — AcademicGroup ObjectId
-
-Success 200:
-  {
-    "group": {
-      "_id"        : "<ObjectId>",
-      "name"       : "CSE-2-A",
-      "type"       : "YEAR_SECTION",
-      "branch"     : "CSE",
-      "year"       : 2,
-      "section"    : "A",
-      "isActive"   : true,
-      "socketRoom" : "<ObjectId>"
-    }
-  }
-
-Errors:
-  403  { "message": "You are not a member of this group" }
-  404  { "message": "Group not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/groups/:groupId/chat
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only; must be a member of the group
-
-Path param:
-  groupId — AcademicGroup ObjectId
-
-Request body (JSON):
-  {
-    "message": "string — required, non-empty"
-  }
-
-Success 201:
-  {
-    "message": "Message sent",
-    "data": {
-      "_id"      : "<ObjectId>",
-      "groupId"  : "<ObjectId>",
-      "sender"   : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-      "message"  : "Hello group!",
-      "isEdited" : false,
-      "createdAt": "ISO date",
-      "updatedAt": "ISO date"
-    }
-  }
-
-Errors:
-  400  { "message": "Message cannot be empty" }
-  403  { "message": "You are not a member of this group" }
-  404  { "message": "Group not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/groups/:groupId/chat
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
-             (requires cookie: token)
-Roles      : STUDENT (must be member) | FACULTY | ADMIN
-
-Path param:
-  groupId — AcademicGroup ObjectId
-
-Query params (optional):
-  page  — number, default 1
-  limit — number, default 50, max 100
-
-Success 200:
-  {
-    "total": 250,
-    "page" : 2,
-    "limit": 50,
-    "messages": [
-      {
-        "_id"      : "<ObjectId>",
-        "groupId"  : "<ObjectId>",
-        "sender"   : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-        "message"  : "Hello!",
-        "isEdited" : false,
-        "createdAt": "ISO date",
-        "updatedAt": "ISO date"
-      },
-      ...
-    ]
-  }
-
-Errors:
-  403  { "message": "You are not a member of this group" }
-  404  { "message": "Group not found" }
-
-
-================================================================================
-  4. CHAT  —  /api/chat  (edit / delete own messages)
-================================================================================
-
-────────────────────────────────────────────────────────────────────────────────
-PUT /api/chat/:messageId
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only; must be the original sender of the message
-
-Path param:
-  messageId — GroupChatMessage ObjectId
-
-Request body (JSON):
-  {
-    "message": "string — required, non-empty, new text"
-  }
-
-Success 200:
-  {
-    "message": "Message updated",
-    "data": {
-      "_id"      : "<ObjectId>",
-      "groupId"  : "<ObjectId>",
-      "sender"   : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-      "message"  : "Edited text",
-      "isEdited" : true,
-      "createdAt": "ISO date",
-      "updatedAt": "ISO date"
-    }
-  }
-
-Errors:
-  400  { "message": "Message cannot be empty" }
-  403  { "message": "You can only edit your own messages" }
-  404  { "message": "Message not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-DELETE /api/chat/:messageId
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only; must be the original sender of the message
-
-Path param:
-  messageId — GroupChatMessage ObjectId
-
-Success 200:
-  {
-    "message": "Message deleted"
-  }
-
-Errors:
-  403  { "message": "You can only delete your own messages" }
-  404  { "message": "Message not found" }
-
-
-================================================================================
-  5. THREADS  —  /api/threads
-================================================================================
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/threads/:groupId
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only; must be a member of the group
-
-Path param:
-  groupId — AcademicGroup ObjectId
-
-Request body (JSON):
-  {
-    "title"  : "string — required",
-    "content": "string — required",
-    "subject": "string — optional, default 'General'"
-  }
-
-Success 201:
-  {
-    "message": "Thread created",
-    "thread": {
-      "_id"       : "<ObjectId>",
-      "groupId"   : "<ObjectId>",
-      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-      "title"     : "How to solve this problem?",
-      "content"   : "Detailed description...",
-      "subject"   : "Mathematics",
-      "isResolved": false,
-      "resolvedBy": null,
-      "createdAt" : "ISO date",
-      "updatedAt" : "ISO date"
-    }
-  }
-
-Errors:
-  400  { "message": "Title and content are required" }
-  403  { "message": "You are not a member of this group" }
-  404  { "message": "Group not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/threads/:groupId
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
-             (requires cookie: token)
-Roles      : STUDENT | FACULTY | ADMIN; must be a member of the group
-
-Path param:
-  groupId — AcademicGroup ObjectId
-
-Query params (optional):
-  subject  — string, case-insensitive partial match
-  resolved — boolean string: "true" | "false"
-  page     — number, default 1
-  limit    — number, default 20, max 100
-
-Success 200:
-  {
-    "total"  : 45,
-    "page"   : 1,
-    "limit"  : 20,
-    "threads": [
-      {
-        "_id"       : "<ObjectId>",
-        "groupId"   : "<ObjectId>",
-        "author"    : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-        "title"     : "Help with OS assignment",
-        "content"   : "...",
-        "subject"   : "Operating Systems",
-        "isResolved": false,
-        "resolvedBy": null,
-        "createdAt" : "ISO date",
-        "updatedAt" : "ISO date"
-      },
-      ...
-    ]
-  }
-
-Errors:
-  403  { "message": "You are not a member of this group" }
-  404  { "message": "Group not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/threads/thread/:threadId
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
-             (requires cookie: token)
-Roles      : STUDENT | FACULTY | ADMIN; must be a member of the thread's group
-
-Path param:
-  threadId — DiscussionThread ObjectId
-
-Success 200:
-  {
-    "thread": {
-      "_id"       : "<ObjectId>",
-      "groupId"   : "<ObjectId>",
-      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-      "title"     : "Help with OS assignment",
-      "content"   : "Full content...",
-      "subject"   : "Operating Systems",
-      "isResolved": true,
-      "resolvedBy": { "_id": "<ObjectId>", "email": "...", "role": "FACULTY" },
-      "createdAt" : "ISO date",
-      "updatedAt" : "ISO date"
-    },
-    "replies": [
-      {
-        "_id"       : "<ObjectId>",
-        "threadId"  : "<ObjectId>",
-        "author"    : { "_id": "<ObjectId>", "email": "...", "role": "FACULTY" },
-        "content"   : "Here is the answer...",
-        "isAccepted": true,
-        "createdAt" : "ISO date",
-        "updatedAt" : "ISO date"
-      },
-      ...
-    ]
-  }
-
-Errors:
-  403  { "message": "You are not a member of this group" }
-  404  { "message": "Thread not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/threads/thread/:threadId/reply
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
-             (requires cookie: token)
-Roles      : STUDENT | FACULTY | ADMIN; must be a member of the thread's group
-
-Path param:
-  threadId — DiscussionThread ObjectId
-
-Request body (JSON):
-  {
-    "content": "string — required, non-empty"
-  }
-
-Success 201:
-  {
-    "message": "Reply added",
-    "reply": {
-      "_id"       : "<ObjectId>",
-      "threadId"  : "<ObjectId>",
-      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "FACULTY" },
-      "content"   : "Here is the solution...",
-      "isAccepted": false,
-      "createdAt" : "ISO date",
-      "updatedAt" : "ISO date"
-    }
-  }
-
-Errors:
-  400  { "message": "Reply content is required" }
-  403  { "message": "You are not a member of this group" }
-  404  { "message": "Thread not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-PUT /api/threads/thread/:threadId/resolve
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT", "FACULTY", "ADMIN")
-             (requires cookie: token)
-Roles      : Thread author OR FACULTY OR ADMIN (enforced in controller)
-
-Path param:
-  threadId — DiscussionThread ObjectId
-
-Request body : none
-
-Success 200:
-  {
-    "message": "Thread marked as resolved",
-    "thread": {
-      "_id"       : "<ObjectId>",
-      "groupId"   : "<ObjectId>",
-      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-      "title"     : "Help with OS assignment",
-      "content"   : "...",
-      "subject"   : "Operating Systems",
-      "isResolved": true,
-      "resolvedBy": { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-      "createdAt" : "ISO date",
-      "updatedAt" : "ISO date"
-    }
-  }
-
-Errors:
-  403  { "message": "Only the thread author or faculty/admin can resolve this" }
-  404  { "message": "Thread not found" }
-
-────────────────────────────────────────────────────────────────────────────────
-PUT /api/threads/reply/:replyId/accept
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only; must be the thread author (enforced in controller)
-Note       : Accepting a reply automatically un-accepts any previously accepted
-             reply within the same thread (only one accepted reply per thread).
-
-Path param:
-  replyId — DiscussionReply ObjectId
-
-Request body : none
-
-Success 200:
-  {
-    "message": "Reply accepted",
-    "reply": {
-      "_id"       : "<ObjectId>",
-      "threadId"  : "<ObjectId>",
-      "author"    : { "_id": "<ObjectId>", "email": "...", "role": "FACULTY" },
-      "content"   : "Here is the solution...",
-      "isAccepted": true,
-      "createdAt" : "ISO date",
-      "updatedAt" : "ISO date"
-    }
-  }
-
-Errors:
-  403  { "message": "Only the thread author can accept a reply" }
-  404  { "message": "Reply not found" }
-  404  { "message": "Thread not found" }
-
-
-================================================================================
-  6. AI  —  /api/ai
-================================================================================
-
-All AI endpoints require cookie-based JWT auth (protect middleware).
-The Gemini 2.5 Flash model is used for all AI generation.
-Set GEMINI_API_KEY in your .env file.
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/ai/roadmap
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-
-Generates a practical, project-based learning roadmap for the given skill and
-persists it to the database under the authenticated user.
-
-Request body (JSON):
-  {
-    "skill" : "string  — required (e.g. 'React', 'Machine Learning')",
-    "level" : "string  — optional, default 'beginner'  (beginner|intermediate|advanced)",
-    "goal"  : "string  — optional, free-text goal (e.g. 'get a job as frontend dev')"
-  }
-
-Success 201:
-  {
-    "message": "Roadmap generated",
-    "roadmap": {
-      "_id"      : "<ObjectId>",
-      "userId"   : "<ObjectId>",
-      "skill"    : "React",
-      "level"    : "beginner",
-      "goal"     : "Build full-stack apps",
-      "roadmap"  : {
-        "skill"        : "React",
-        "overview"     : "string",
-        "totalDuration": "string",
-        "phases"       : [
-          {
-            "phase"    : 1,
-            "title"    : "string",
-            "duration" : "string",
-            "topics"   : ["string", ...],
-            "resources": [
-              { "title": "string", "url": "string",
-                "type": "video|article|docs|book|course" }
-            ],
-            "project"  : { "title": "string", "description": "string" }
-          }
-        ],
-        "finalProject" : { "title": "string", "description": "string" },
-        "tips"         : ["string", ...]
-      },
-      "createdAt": "ISO date",
-      "updatedAt": "ISO date"
-    }
-  }
-
-Errors:
-  400  { "message": "skill is required" }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/ai/roadmap
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-
-Returns a summary list of all roadmaps saved by the authenticated user
-(skill, level, goal, createdAt — no full roadmap payload).
-
-Request body : none
-
-Success 200:
-  {
-    "count"   : 3,
-    "roadmaps": [
-      {
-        "_id"      : "<ObjectId>",
-        "skill"    : "React",
-        "level"    : "beginner",
-        "goal"     : "Build full-stack apps",
-        "createdAt": "ISO date"
-      },
-      ...
-    ]
-  }
-
-Errors:
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/ai/roadmap/:roadmapId
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-Note       : Only the owner of the roadmap can fetch it.
-
-Path param:
-  roadmapId — Roadmap ObjectId
-
-Success 200:
-  {
-    "roadmap": {
-      "_id"      : "<ObjectId>",
-      "userId"   : "<ObjectId>",
-      "skill"    : "React",
-      "level"    : "beginner",
-      "goal"     : "Build full-stack apps",
-      "roadmap"  : { ...full roadmap JSON as described in POST response... },
-      "createdAt": "ISO date",
-      "updatedAt": "ISO date"
-    }
-  }
-
-Errors:
-  404  { "message": "Roadmap not found" }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/ai/study-plan
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-
-Generates a personalised weekly study plan and persists it to the database
-under the authenticated user.
-
-Request body (JSON):
-  {
-    "subjects"   : ["string", ...]  — required, at least one subject",
-    "examDate"   : "string  — optional, ISO date (e.g. '2026-04-15')",
-    "hoursPerDay": "number  — optional, default 4",
-    "goals"      : "string  — optional"
-  }
-
-Success 201:
-  {
-    "message": "Study plan generated",
-    "studyPlan": {
-      "_id"        : "<ObjectId>",
-      "userId"     : "<ObjectId>",
-      "subjects"   : ["Math", "OS"],
-      "examDate"   : "ISO date | null",
-      "hoursPerDay": 4,
-      "goals"      : "string | null",
-      "plan": {
-        "totalWeeks" : 3,
-        "dailyHours" : 4,
-        "weeklyPlan" : [
-          {
-            "week"         : 1,
-            "focus"        : "string",
-            "dailySchedule": [
-              {
-                "day"    : "Monday",
-                "subject": "Math",
-                "topics" : ["string", ...],
-                "hours"  : 2,
-                "task"   : "string"
-              }
-            ]
-          }
-        ],
-        "revisionStrategy": "string",
-        "tips"            : ["string", ...]
-      },
-      "createdAt": "ISO date",
-      "updatedAt": "ISO date"
-    }
-  }
-
-Errors:
-  400  { "message": "subjects array is required" }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/ai/study-plan
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-
-Returns a summary list of all study plans saved by the authenticated user
-(subjects, examDate, hoursPerDay, goals, createdAt — no full plan payload).
-
-Request body : none
-
-Success 200:
-  {
-    "count"     : 2,
-    "studyPlans": [
-      {
-        "_id"        : "<ObjectId>",
-        "subjects"   : ["Math", "OS"],
-        "examDate"   : "ISO date | null",
-        "hoursPerDay": 4,
-        "goals"      : "string | null",
-        "createdAt"  : "ISO date"
-      },
-      ...
-    ]
-  }
-
-Errors:
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/ai/study-plan/:planId
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-Note       : Only the owner of the study plan can fetch it.
-
-Path param:
-  planId — StudyPlan ObjectId
-
-Success 200:
-  {
-    "studyPlan": {
-      "_id"      : "<ObjectId>",
-      "userId"   : "<ObjectId>",
-      "subjects" : ["Math", "OS"],
-      "examDate" : "ISO date | null",
-      "hoursPerDay": 4,
-      "goals"    : "string | null",
-      "plan"     : { ...full plan JSON as described in POST response... },
-      "createdAt": "ISO date",
-      "updatedAt": "ISO date"
-    }
-  }
-
-Errors:
-  404  { "message": "Study plan not found" }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/ai/doubt-assist/:threadId
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-
-Reads the given discussion thread and its existing replies, then returns an
-AI-generated suggested answer. Not persisted.
-
-Path param:
-  threadId — DiscussionThread ObjectId
-
-Request body : none
-
-Success 200:
-  {
-    "message"    : "AI suggestion generated",
-    "threadId"   : "<ObjectId>",
-    "threadTitle": "How do I reverse a linked list?",
-    "suggestion" : {
-      "suggestedReply": "string",
-      "keyPoints"     : ["string", ...],
-      "relatedTopics" : ["string", ...],
-      "confidence"    : "high|medium|low"
-    }
-  }
-
-Errors:
-  404  { "message": "Thread not found" }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-GET /api/ai/recommendations
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect → authorize("STUDENT")  (requires cookie: token)
-Roles      : STUDENT only
-Note       : Requires an existing StudentProfile. Uses branch, year, skills,
-             and interests to personalise results.
-
-Request body : none
-
-Success 200:
-  {
-    "message": "Recommendations generated",
-    "data": {
-      "focusAreas"     : ["string", ...],
-      "recommendations": [
-        {
-          "title"        : "string",
-          "description"  : "string",
-          "url"          : "string",
-          "type"         : "video|course|article|book|tool|documentation",
-          "topic"        : "string",
-          "difficulty"   : "beginner|intermediate|advanced",
-          "isFree"       : true,
-          "estimatedTime": "string"
-        },
-        ...  (exactly 10 items)
-      ]
-    }
-  }
-
-Errors:
-  404  { "message": "Student profile not found. Create a profile first." }
-  500  { "error": "<message>" }
-
-────────────────────────────────────────────────────────────────────────────────
-POST /api/ai/study-suggestions
-────────────────────────────────────────────────────────────────────────────────
-Middleware : protect  (requires cookie: token)
-Roles      : ADMIN | FACULTY | STUDENT
-
-Analyses performance data and returns targeted, prioritised improvement
-strategies. Not persisted.
-
-Request body (JSON):
-  {
-    "weakSubjects"  : ["string", ...]  — required, at least one subject",
-    "strongSubjects": ["string", ...]  — optional",
-    "recentScores"  : { "<subject>": number, ... }  — optional, scores as %",
-    "goals"         : "string  — optional"
-  }
-
-Success 200:
-  {
-    "message"    : "Study suggestions generated",
-    "suggestions": {
-      "analysis"        : "string",
-      "prioritySubjects": ["string", ...],
-      "suggestions"     : [
-        {
-          "subject"    : "string",
-          "issue"      : "string",
-          "strategy"   : "string",
-          "resources"  : ["string", ...],
-          "weeklyHours": 3
-        }
-      ],
-      "milestones"      : ["string", ...],
-      "motivationalTip" : "string"
-    }
-  }
-
-Errors:
-  400  { "message": "weakSubjects array is required" }
-  500  { "error": "<message>" }
-
-
-================================================================================
-  7. SOCKET.IO EVENTS  —  ws://localhost:5000
-================================================================================
-
-Connection requires credentials: true (the same cookie is forwarded).
-
-Client → Server events:
-  joinGroup   { groupId: "<ObjectId>" }   — join a group's Socket.IO room
-  leaveGroup  { groupId: "<ObjectId>" }   — leave a group's Socket.IO room
-  sendMessage { groupId: "<ObjectId>", message: "string" }
-
-Server → Client events:
-  newMessage  — emitted to all members of the room on a new chat message
-    {
-      "_id"      : "<ObjectId>",
-      "groupId"  : "<ObjectId>",
-      "sender"   : { "_id": "<ObjectId>", "email": "...", "role": "STUDENT" },
-      "message"  : "Hello!",
-      "isEdited" : false,
-      "createdAt": "ISO date",
-      "updatedAt": "ISO date"
-    }
-
-Note: The socketRoom value returned by GET /api/groups/my and
-      GET /api/groups/:groupId/open is identical to the groupId used here.
-
-
-================================================================================
-  ROLE SUMMARY
-================================================================================
-
-  Endpoint                                     STUDENT   FACULTY   ADMIN
-  ─────────────────────────────────────────────────────────────────────────
-  POST   /api/auth/register                      ✓         ✓         ✓
-  POST   /api/auth/login                         ✓         ✓         ✓
-  GET    /api/auth/me                            ✓         ✓         ✓
-  POST   /api/auth/logout                        ✓         ✓         ✓
-  POST   /api/profile                            ✓
-  GET    /api/profile/me                         ✓
-  PUT    /api/profile                            ✓
-  GET    /api/profile/filter                               ✓         ✓
-  GET    /api/profile/view/:id                             ✓         ✓
-  GET    /api/groups/my                          ✓
-  GET    /api/groups                                       ✓         ✓
-  GET    /api/groups/:groupId/members                      ✓         ✓
-  GET    /api/groups/:groupId/open               ✓         ✓         ✓
-  POST   /api/groups/:groupId/chat               ✓
-  GET    /api/groups/:groupId/chat               ✓         ✓         ✓
-  PUT    /api/chat/:messageId                    ✓
-  DELETE /api/chat/:messageId                    ✓
-  POST   /api/threads/:groupId                   ✓
-  GET    /api/threads/:groupId                   ✓         ✓         ✓
-  GET    /api/threads/thread/:threadId           ✓         ✓         ✓
-  POST   /api/threads/thread/:threadId/reply     ✓         ✓         ✓
-  PUT    /api/threads/thread/:threadId/resolve   ✓*        ✓         ✓
-  PUT    /api/threads/reply/:replyId/accept      ✓*
-  POST   /api/ai/roadmap                          ✓         ✓         ✓
-  GET    /api/ai/roadmap                          ✓         ✓         ✓
-  GET    /api/ai/roadmap/:roadmapId               ✓         ✓         ✓
-  POST   /api/ai/study-plan                       ✓         ✓         ✓
-  GET    /api/ai/study-plan                       ✓         ✓         ✓
-  GET    /api/ai/study-plan/:planId               ✓         ✓         ✓
-  POST   /api/ai/doubt-assist/:threadId           ✓         ✓         ✓
-  GET    /api/ai/recommendations                  ✓
-  POST   /api/ai/study-suggestions                ✓         ✓         ✓
-  ─────────────────────────────────────────────────────────────────────────
-  * STUDENT role with additional ownership enforced in controller:
-    resolve  — only thread author
-    accept   — only thread author
+CollegeHub is an all-in-one digital campus platform that connects students,
+faculty, and administration in one place. It handles everything from real-time
+group chats and quiz competitions to AI-powered study tools and campus events —
+all built around the structure of a real college.
+
+
+  WHO USES IT
+
+
+  Students   — The primary users. Can join groups, chat, take quizzes,
+               explore clubs, use AI tools, and share resources.
+
+  Faculty    — Can create quizzes, upload study material, manage clubs,
+               organise events, and view student data.
+
+  Admin      — Full platform oversight, can view all statistics and
+               manage the entire system.
+
+
+  FEATURES
+
+
+
+1. ACCOUNTS & PROFILES
+
+
+  Every user registers with an email, password, and role.
+
+  Students fill out a profile with:
+    - Branch, year, and section (e.g. CSE, Year 2, Section A)
+    - Roll number
+    - Skills and interests
+    - Resume link (Google Drive)
+    - Portfolio link (Google Drive)
+    - Profile picture
+
+  When a student creates their profile, the system automatically places them
+  into the correct academic groups — one for their whole year (e.g. CSE-2)
+  and one for their section (e.g. CSE-2-A). No manual setup needed.
+
+  Faculty can search and view all student profiles, filtered by year,
+  section, or branch. They can also download a full student list as a
+  spreadsheet (CSV) — with optional filters like "only students who have
+  uploaded a resume."
+
+
+2. ACADEMIC GROUPS & GROUP CHAT
+
+
+  Groups are the core of CollegeHub. Every student is automatically in two
+  groups: their year group and their section group.
+
+  Inside each group, members can:
+    - Chat in real time (messages appear instantly, no page refresh needed)
+    - Send images in chat
+    - Edit or delete their own messages
+    - See all previous messages in order
+
+  Faculty and admins can read all group chats and moderate content.
+  Real-time messaging is powered by Socket.IO (like WhatsApp Web).
+
+
+3. DISCUSSION THREADS
+
+
+  Inside any group, students can post a discussion thread — a structured
+  question or topic with a title, description, and subject tag (like a
+  mini Stack Overflow for each class).
+
+  Others in the group can reply. The thread author (or faculty/admin) can
+  mark the thread as "resolved" once answered. The best reply can be
+  "accepted" to highlight it as the solution.
+
+  Faculty can also trigger an AI-generated suggested answer for any thread
+  with a single click (see AI Features below).
+
+
+4. REAL-TIME QUIZZES
+
+
+  Faculty create multiple-choice quizzes with a time limit per question.
+  Students join and compete live — questions are pushed to everyone at the
+  same time, scores are calculated instantly, and a leaderboard is shown
+  at the end. The whole experience is real-time (Socket.IO), so it feels
+  like a live game show.
+
+  Quiz results are stored and visible in each student's dashboard
+  (last 5 quiz scores with time taken).
+
+
+5. ACADEMIC RESOURCES
+
+
+  Faculty can upload study materials — PDFs of notes, past papers, and
+  reference documents — directly to a group. Students in the group can
+  browse, search, and download those files at any time.
+
+  Files are stored securely on the server. Searches work by subject name,
+  file type, exam year, or any keyword.
+
+
+6. CAMPUS FORUMS
+
+
+  The forums are a campus-wide discussion board — not limited to any one
+  group. Anyone can post a thread on any topic and the entire college
+  community can participate.
+
+  Features:
+    - Post a forum thread with a title, description, topic tag, and hashtags
+    - Edit or delete your own posts
+    - Reply to threads (and reply to replies — nested conversations)
+    - Like or dislike any post or reply
+    - Search by keyword (partial matches work — "vi" finds "vibe coding")
+    - Filter by topic or see only your own posts
+
+  This is a pure REST system — no live connection needed, just refresh
+  to see new posts.
+
+
+7. CLUBS
+
+
+  Students can browse and join college clubs (Tech, Cultural, Sports, Social,
+  etc.). Faculty can create clubs and assign co-leaders from among the members.
+
+  Club features:
+    - Create a club with a name, description, logo, category, and tags
+    - Students join or leave clubs freely
+    - Club leaders can promote members, kick members, and transfer leadership
+    - Each club can host its own events (see Events below)
+    - Faculty/admin can manage clubs they lead
+
+
+8. EVENTS
+
+
+  Faculty and admins can create events that target:
+    - The whole college (e.g. Annual Tech Fest)
+    - A specific academic group (e.g. Guest lecture for CSE-3)
+    - A specific club (e.g. Football club match)
+
+  Events include a title, date, time, venue, description, poster image,
+  and tags. Students can RSVP to mark their attendance.
+
+  When an event is created, automatic notifications are sent to everyone
+  it targets — college-wide events reach all users, group events reach
+  group members, club events reach club members.
+
+
+9. NOTIFICATIONS
+
+
+  Users receive in-app notifications for:
+    - Quiz starting in their group
+    - New events (college, group, or club)
+
+  Notifications can be marked as read one-by-one or all at once.
+  An unread count is always available for the notification bell icon.
+
+
+10. AI-POWERED STUDY TOOLS
+
+
+  CollegeHub's AI features are powered by Google Gemini 2.5 Flash.
+  Every tool is personalised and responds in seconds.
+
+  a) SKILL ROADMAP GENERATOR
+     Tell the AI a skill you want to learn (e.g. "Machine Learning" or
+     "Web Development") and it builds a complete, phase-by-phase learning
+     plan with topics, resources, and projects. Saved to your account.
+
+  b) WEEKLY STUDY PLAN BUILDER
+     Enter your subjects, exam date, and available hours per day. The AI
+     creates a full week-by-week schedule with daily tasks and a revision
+     strategy. Saved to your account.
+
+  c) DOUBT ASSISTANT (Thread-based)
+     On any group discussion thread, tap "Ask AI" and the AI reads the
+     question plus all existing replies, then suggests a clear answer. Good
+     for teachers who want a quick draft answer, or students stuck on a topic.
+
+  d) RESOURCE RECOMMENDATIONS
+     Students get 10 personalised learning resources (videos, courses,
+     articles, tools) based on their branch, year, skills, and interests.
+     All free resources are marked clearly.
+
+  e) PERFORMANCE-BASED STUDY SUGGESTIONS
+     Submit your weak subjects and recent scores. The AI analyses the
+     pattern and gives a targeted improvement plan for each subject with
+     specific strategies, recommended resources, and a weekly hour budget.
+
+  f) AI DOUBT CHAT (Conversational Tutor)
+     A persistent, multi-turn chat with an AI academic tutor. Like ChatGPT
+     but focused on academic help. Ask follow-up questions — the AI
+     remembers the whole conversation. Students can clear the history
+     anytime to start fresh.
+
+
+11. DASHBOARD
+
+
+  Every user sees a personalised dashboard when they log in. It adapts
+  based on their role.
+
+  Student dashboard shows:
+    - Profile summary, groups, and clubs
+    - Recent quiz scores with performance stats (last 5 quizzes)
+    - Quick links to key features
+    - Study tips and trending forum topics
+    - Upcoming events on campus
+
+  Faculty dashboard shows:
+    - Clubs they lead
+    - Recent quizzes created (with participant counts)
+    - Platform-wide stats (total students, groups, events organised)
+    - Quick links to create quizzes, upload resources, and manage events
+
+  Admin dashboard shows:
+    - Full platform statistics (users, groups, clubs, events, quizzes,
+      resources, forums, notifications — all broken down)
+    - Recent user signups
+
+  Everyone sees:
+    - Campus announcements
+    - Academic calendar (key dates for the semester)
+    - Upcoming events (next 5, with RSVP status)
+    - Unread notification count
+
+
+12. IDENTITY SAFETY (Deepfake Detection — Planned Integration)
+
+
+  Profile picture uploads can be run through a deepfake detection API.
+  Any AI-generated or manipulated face photo gets flagged automatically,
+  ensuring that the college directory shows real identities.
+  This helps maintain trust between students and faculty on the platform.
+
+
+  TECHNOLOGY OVERVIEW (for slightly technical readers)
+
+
+  Backend    : Node.js + Express 5
+  Database   : MongoDB via Mongoose 9
+  Real-time  : Socket.IO 4 (group chat, quizzes)
+  AI Engine  : Google Gemini 2.5 Flash via @google/generative-ai
+  Images     : Cloudinary (profile pictures, chat images, event posters)
+  Files      : Multer + disk storage (PDF academic resources)
+  Auth       : JWT stored in HttpOnly cookie (7-day expiry)
+  Roles      : STUDENT | FACULTY | ADMIN with middleware guards
 
 ================================================================================

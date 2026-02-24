@@ -68,7 +68,7 @@ exports.getMyProfile = async (req, res) => {
   try {
     const profile = await StudentProfile.findOne({ userId: req.user.userId }).populate(
       "userId",
-      "email role"
+      "name email role profilePicture"
     );
 
     if (!profile)
@@ -115,7 +115,7 @@ exports.viewProfile = async (req, res) => {
   try {
     const profile = await StudentProfile.findById(req.params.id).populate(
       "userId",
-      "email role"
+      "name email role profilePicture"
     );
 
     if (!profile)
@@ -123,6 +123,40 @@ exports.viewProfile = async (req, res) => {
 
     res.json({ profile });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// PUT /api/profile/me/user — update own name and/or profile picture (all roles)
+exports.updateUserInfo = async (req, res) => {
+  try {
+    const updates = {};
+
+    if (req.body.name !== undefined) {
+      const trimmed = req.body.name.trim();
+      if (trimmed.length > 100)
+        return res.status(400).json({ message: "Name must be 100 characters or fewer" });
+      updates.name = trimmed || null;
+    }
+
+    // If an image was uploaded via multer-cloudinary, req.file.path holds the URL
+    if (req.file) {
+      updates.profilePicture = req.file.path;
+    }
+
+    if (Object.keys(updates).length === 0)
+      return res.status(400).json({ message: "No updatable fields provided" });
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select("name email role profilePicture");
+
+    res.json({ message: "User info updated", user });
+  } catch (error) {
+    if (error.name === "ValidationError")
+      return res.status(400).json({ error: error.message });
     res.status(500).json({ error: error.message });
   }
 };
