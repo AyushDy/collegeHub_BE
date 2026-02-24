@@ -1,6 +1,6 @@
 AI  —  /api/ai
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-All routes: protect. Model: Gemini 2.0 Flash. Env: GEMINI_API_KEY.
+All routes: protect. Model: Gemini 2.5 Flash. Env: GEMINI_API_KEY.
 Roadmap endpoints persist to DB. All others are ephemeral.
 
 ──────────────────────────────────────────

@@ -5,7 +5,7 @@ const DiscussionReply = require("../models/DiscussionReply");
 const StudentProfile = require("../models/StudentProfile");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // Strip markdown code fences that Gemini sometimes wraps JSON in
 function parseGeminiJSON(text) {
@@ -14,6 +14,24 @@ function parseGeminiJSON(text) {
     .replace(/```\s*/gi, "")
     .trim();
   return JSON.parse(cleaned);
+}
+
+// Retry wrapper — handles 429 with exponential backoff (max 3 attempts)
+async function generateWithRetry(prompt, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (err) {
+      const is429 = err?.status === 429 || err?.message?.includes("429");
+      if (is429 && attempt < retries) {
+        const delay = 2 ** attempt * 1000; // 2s, 4s, 8s
+        await new Promise((res) => setTimeout(res, delay));
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 // ─── ROADMAP GENERATOR ───────────────────────────────────────────────────────
@@ -57,8 +75,7 @@ Return ONLY valid JSON matching this exact schema (no extra text, no markdown):
   "tips": string[]
 }`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await generateWithRetry(prompt);
     const roadmapData = parseGeminiJSON(text);
 
     const saved = await Roadmap.create({
@@ -165,8 +182,7 @@ Return ONLY valid JSON (no markdown, no extra text):
   "tips": string[]
 }`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await generateWithRetry(prompt);
     const plan = parseGeminiJSON(text);
 
     res.json({ message: "Study plan generated", plan });
@@ -222,8 +238,7 @@ Return ONLY valid JSON (no markdown):
   "confidence": "high|medium|low"
 }`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await generateWithRetry(prompt);
     const suggestion = parseGeminiJSON(text);
 
     res.json({
@@ -274,8 +289,7 @@ Return ONLY valid JSON (no markdown):
   ]
 }`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await generateWithRetry(prompt);
     const data = parseGeminiJSON(text);
 
     res.json({ message: "Recommendations generated", data });
@@ -328,8 +342,7 @@ Return ONLY valid JSON (no markdown):
   "motivationalTip": string
 }`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await generateWithRetry(prompt);
     const suggestions = parseGeminiJSON(text);
 
     res.json({ message: "Study suggestions generated", suggestions });
