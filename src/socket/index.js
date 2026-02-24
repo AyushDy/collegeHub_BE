@@ -171,7 +171,6 @@ module.exports = (io) => {
       }
     });
 
-    // ── resolveThread ─────────────────────────────────────────────────────────
     socket.on("resolveThread", async ({ threadId }) => {
       try {
         if (!threadId)

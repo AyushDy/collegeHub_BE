@@ -32,6 +32,7 @@ const profileRoutes = require("./src/routes/profileRoutes");
 const groupRoutes = require("./src/routes/groupRoutes");
 const chatRoutes = require("./src/routes/chatRoutes");
 const threadRoutes = require("./src/routes/threadRoutes");
+const aiRoutes = require("./src/routes/aiRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
@@ -39,6 +40,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/threads", threadRoutes);
+app.use("/api/ai", aiRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

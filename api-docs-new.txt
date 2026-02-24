@@ -782,7 +782,281 @@ Errors:
 
 
 ================================================================================
-  6. SOCKET.IO EVENTS  —  ws://localhost:5000
+  6. AI  —  /api/ai
+================================================================================
+
+All AI endpoints require cookie-based JWT auth (protect middleware).
+The Gemini 1.5 Flash model is used for all AI generation.
+Set GEMINI_API_KEY in your .env file.
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/ai/roadmap
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+
+Generates a practical, project-based learning roadmap for the given skill and
+persists it to the database under the authenticated user.
+
+Request body (JSON):
+  {
+    "skill" : "string  — required (e.g. 'React', 'Machine Learning')",
+    "level" : "string  — optional, default 'beginner'  (beginner|intermediate|advanced)",
+    "goal"  : "string  — optional, free-text goal (e.g. 'get a job as frontend dev')"
+  }
+
+Success 201:
+  {
+    "message": "Roadmap generated",
+    "roadmap": {
+      "_id"      : "<ObjectId>",
+      "userId"   : "<ObjectId>",
+      "skill"    : "React",
+      "level"    : "beginner",
+      "goal"     : "Build full-stack apps",
+      "roadmap"  : {
+        "skill"        : "React",
+        "overview"     : "string",
+        "totalDuration": "string",
+        "phases"       : [
+          {
+            "phase"    : 1,
+            "title"    : "string",
+            "duration" : "string",
+            "topics"   : ["string", ...],
+            "resources": [
+              { "title": "string", "url": "string",
+                "type": "video|article|docs|book|course" }
+            ],
+            "project"  : { "title": "string", "description": "string" }
+          }
+        ],
+        "finalProject" : { "title": "string", "description": "string" },
+        "tips"         : ["string", ...]
+      },
+      "createdAt": "ISO date",
+      "updatedAt": "ISO date"
+    }
+  }
+
+Errors:
+  400  { "message": "skill is required" }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/ai/roadmap
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+
+Returns a summary list of all roadmaps saved by the authenticated user
+(skill, level, goal, createdAt — no full roadmap payload).
+
+Request body : none
+
+Success 200:
+  {
+    "count"   : 3,
+    "roadmaps": [
+      {
+        "_id"      : "<ObjectId>",
+        "skill"    : "React",
+        "level"    : "beginner",
+        "goal"     : "Build full-stack apps",
+        "createdAt": "ISO date"
+      },
+      ...
+    ]
+  }
+
+Errors:
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/ai/roadmap/:roadmapId
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+Note       : Only the owner of the roadmap can fetch it.
+
+Path param:
+  roadmapId — Roadmap ObjectId
+
+Success 200:
+  {
+    "roadmap": {
+      "_id"      : "<ObjectId>",
+      "userId"   : "<ObjectId>",
+      "skill"    : "React",
+      "level"    : "beginner",
+      "goal"     : "Build full-stack apps",
+      "roadmap"  : { ...full roadmap JSON as described in POST response... },
+      "createdAt": "ISO date",
+      "updatedAt": "ISO date"
+    }
+  }
+
+Errors:
+  404  { "message": "Roadmap not found" }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/ai/study-plan
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+
+Generates a personalised weekly study plan from a list of subjects. Not
+persisted — response is ephemeral.
+
+Request body (JSON):
+  {
+    "subjects"   : ["string", ...]  — required, at least one subject",
+    "examDate"   : "string  — optional, ISO date (e.g. '2026-04-15')",
+    "hoursPerDay": "number  — optional, default 4",
+    "goals"      : "string  — optional"
+  }
+
+Success 200:
+  {
+    "message": "Study plan generated",
+    "plan": {
+      "totalWeeks" : 3,
+      "dailyHours" : 4,
+      "weeklyPlan" : [
+        {
+          "week"         : 1,
+          "focus"        : "string",
+          "dailySchedule": [
+            {
+              "day"    : "Monday",
+              "subject": "Math",
+              "topics" : ["string", ...],
+              "hours"  : 2,
+              "task"   : "string"
+            }
+          ]
+        }
+      ],
+      "revisionStrategy": "string",
+      "tips"            : ["string", ...]
+    }
+  }
+
+Errors:
+  400  { "message": "subjects array is required" }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/ai/doubt-assist/:threadId
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+
+Reads the given discussion thread and its existing replies, then returns an
+AI-generated suggested answer. Not persisted.
+
+Path param:
+  threadId — DiscussionThread ObjectId
+
+Request body : none
+
+Success 200:
+  {
+    "message"    : "AI suggestion generated",
+    "threadId"   : "<ObjectId>",
+    "threadTitle": "How do I reverse a linked list?",
+    "suggestion" : {
+      "suggestedReply": "string",
+      "keyPoints"     : ["string", ...],
+      "relatedTopics" : ["string", ...],
+      "confidence"    : "high|medium|low"
+    }
+  }
+
+Errors:
+  404  { "message": "Thread not found" }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/ai/recommendations
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect → authorize("STUDENT")  (requires cookie: token)
+Roles      : STUDENT only
+Note       : Requires an existing StudentProfile. Uses branch, year, skills,
+             and interests to personalise results.
+
+Request body : none
+
+Success 200:
+  {
+    "message": "Recommendations generated",
+    "data": {
+      "focusAreas"     : ["string", ...],
+      "recommendations": [
+        {
+          "title"        : "string",
+          "description"  : "string",
+          "url"          : "string",
+          "type"         : "video|course|article|book|tool|documentation",
+          "topic"        : "string",
+          "difficulty"   : "beginner|intermediate|advanced",
+          "isFree"       : true,
+          "estimatedTime": "string"
+        },
+        ...  (exactly 10 items)
+      ]
+    }
+  }
+
+Errors:
+  404  { "message": "Student profile not found. Create a profile first." }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+POST /api/ai/study-suggestions
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+
+Analyses performance data and returns targeted, prioritised improvement
+strategies. Not persisted.
+
+Request body (JSON):
+  {
+    "weakSubjects"  : ["string", ...]  — required, at least one subject",
+    "strongSubjects": ["string", ...]  — optional",
+    "recentScores"  : { "<subject>": number, ... }  — optional, scores as %",
+    "goals"         : "string  — optional"
+  }
+
+Success 200:
+  {
+    "message"    : "Study suggestions generated",
+    "suggestions": {
+      "analysis"        : "string",
+      "prioritySubjects": ["string", ...],
+      "suggestions"     : [
+        {
+          "subject"    : "string",
+          "issue"      : "string",
+          "strategy"   : "string",
+          "resources"  : ["string", ...],
+          "weeklyHours": 3
+        }
+      ],
+      "milestones"      : ["string", ...],
+      "motivationalTip" : "string"
+    }
+  }
+
+Errors:
+  400  { "message": "weakSubjects array is required" }
+  500  { "error": "<message>" }
+
+
+================================================================================
+  7. SOCKET.IO EVENTS  —  ws://localhost:5000
 ================================================================================
 
 Connection requires credentials: true (the same cookie is forwarded).
@@ -837,6 +1111,13 @@ Note: The socketRoom value returned by GET /api/groups/my and
   POST   /api/threads/thread/:threadId/reply     ✓         ✓         ✓
   PUT    /api/threads/thread/:threadId/resolve   ✓*        ✓         ✓
   PUT    /api/threads/reply/:replyId/accept      ✓*
+  POST   /api/ai/roadmap                          ✓         ✓         ✓
+  GET    /api/ai/roadmap                          ✓         ✓         ✓
+  GET    /api/ai/roadmap/:roadmapId               ✓         ✓         ✓
+  POST   /api/ai/study-plan                       ✓         ✓         ✓
+  POST   /api/ai/doubt-assist/:threadId           ✓         ✓         ✓
+  GET    /api/ai/recommendations                  ✓
+  POST   /api/ai/study-suggestions                ✓         ✓         ✓
   ─────────────────────────────────────────────────────────────────────────
   * STUDENT role with additional ownership enforced in controller:
     resolve  — only thread author

@@ -35,7 +35,6 @@
             resumeLink, portfolioLink, isActive
   - Validation: year (1–4), section (single uppercase letter),
                 resumeLink/portfolioLink (Google Drive URL regex)
-  - Indexes: unique(userId), compound(year+section), branch
 - Profile controller (src/controllers/profileController.js)
   - POST /api/profile              → create profile (STUDENT, once) + auto-creates AcademicGroup
   - GET  /api/profile/me           → own profile (STUDENT)
@@ -118,11 +117,24 @@
 [ ] Search and filter across resources
 
 [AI INTEGRATION]
-[ ] AI-powered study roadmap generator
-[ ] Personalized study plan builder
-[ ] Smart doubt assistance (AI reply suggestions)
-[ ] AI-based content/resource recommendations
-[ ] Performance-based study suggestions
+✅ AI-powered study roadmap generator
+    - POST /api/ai/roadmap              → generate & persist skill roadmap (Gemini 1.5 Flash)
+    - GET  /api/ai/roadmap              → list user's saved roadmaps
+    - GET  /api/ai/roadmap/:roadmapId   → fetch full roadmap
+    - DELETE /api/ai/roadmap/:roadmapId → delete roadmap
+    - Model: src/models/Roadmap.js (userId, skill, level, goal, roadmap JSON)
+✅ Personalized study plan builder
+    - POST /api/ai/study-plan           → weekly plan from subjects + exam date + hours/day
+✅ Smart doubt assistance (AI reply suggestions)
+    - POST /api/ai/doubt-assist/:threadId → AI reply suggestion for a discussion thread
+✅ AI-based content/resource recommendations
+    - GET  /api/ai/recommendations      → 10 curated resources from student profile (STUDENT only)
+✅ Performance-based study suggestions
+    - POST /api/ai/study-suggestions    → targeted advice from weakSubjects + scores
+    - Controller: src/controllers/aiController.js
+    - Routes: src/routes/aiRoutes.js
+    - Gemini SDK: @google/generative-ai (gemini-1.5-flash)
+    - Env var: GEMINI_API_KEY (add your key to .env)
 
 [QUIZ & ASSESSMENT SYSTEM]
 [ ] Post-lecture quiz creation (faculty)
