@@ -52,6 +52,7 @@ Errors:
   GET    /api/profile/me                      ✓
   PUT    /api/profile                         ✓
   GET    /api/profile/filter                        ✓     ✓
+  GET    /api/profile/export/csv                    ✓     ✓
   GET    /api/profile/view/:id                      ✓     ✓
   GET    /api/groups/my                       ✓
   GET    /api/groups                                ✓     ✓

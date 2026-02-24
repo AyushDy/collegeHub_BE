@@ -22,6 +22,20 @@ GET /api/profile/filter          [FACULTY | ADMIN]
   Query: year?, section?, branch?
   200  : { count, profiles[] }
 
+GET /api/profile/export/csv      [FACULTY | ADMIN]
+  Downloads a CSV file of student profiles.
+  Query params (all optional):
+    branch      substring match, case-insensitive
+    year        1–4
+    section     substring match, case-insensitive
+    hasResume   "true" — only students with a resumeLink
+                "false" — only students without a resumeLink
+    groupId     restrict to members of a specific group
+  Response: text/csv download, filename students_{timestamp}.csv
+  Columns: name, email, rollNumber, branch, year, section,
+           skills (;-separated), interests (;-separated),
+           resumeLink, portfolioLink
+
 GET /api/profile/view/:id        [FACULTY | ADMIN]
   200  : { profile }  (userId populated)
   404  : "Profile not found"

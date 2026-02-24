@@ -9,6 +9,7 @@ router.get("/me", protect, authorize("STUDENT"), profileController.getMyProfile)
 router.put("/", protect, authorize("STUDENT"), profileController.updateProfile);
 
 // Faculty / Admin routes
+router.get("/export/csv", protect, authorize("FACULTY", "ADMIN"), profileController.exportStudentsCsv);
 router.get("/filter", protect, authorize("FACULTY", "ADMIN"), profileController.filterProfiles);
 router.get("/view/:id", protect, authorize("FACULTY", "ADMIN"), profileController.viewProfile);
 

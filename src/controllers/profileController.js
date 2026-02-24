@@ -1,6 +1,7 @@
 const StudentProfile = require("../models/StudentProfile");
 const AcademicGroup = require("../models/AcademicGroup");
 const GroupMembership = require("../models/GroupMembership");
+const User = require("../models/User");
 
 // POST /api/profile — create profile (student only, once)
 exports.createProfile = async (req, res) => {
@@ -141,6 +142,73 @@ exports.filterProfiles = async (req, res) => {
       .sort({ year: 1, section: 1, rollNumber: 1 });
 
     res.json({ count: profiles.length, profiles });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ─── GET /api/profile/export/csv ────────────────────────────────────────────
+// Faculty/Admin: download student data as CSV
+// Query params: branch, year, section, hasResume (true/false), groupId
+exports.exportStudentsCsv = async (req, res) => {
+  try {
+    const { branch, year, section, hasResume, groupId } = req.query;
+
+    const filter = { isActive: true };
+
+    if (branch) filter.branch = { $regex: branch, $options: "i" };
+    if (year) filter.year = Number(year);
+    if (section) filter.section = { $regex: section, $options: "i" };
+    if (hasResume === "true") filter.resumeLink = { $ne: null, $exists: true };
+    if (hasResume === "false") filter.$or = [{ resumeLink: null }, { resumeLink: { $exists: false } }];
+
+    // If groupId provided, restrict to members of that group
+    if (groupId) {
+      const memberships = await GroupMembership.find({ groupId }).select("userId").lean();
+      const userIds = memberships.map((m) => m.userId);
+      filter.userId = { $in: userIds };
+    }
+
+    const profiles = await StudentProfile.find(filter)
+      .populate("userId", "name email")
+      .sort({ year: 1, section: 1, rollNumber: 1 })
+      .lean();
+
+    // ── Build CSV ──────────────────────────────────────────────────────────
+    const escape = (val) => {
+      if (val === null || val === undefined) return "";
+      const str = String(val);
+      // Wrap in quotes if value contains comma, quote, or newline
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    };
+
+    const headers = [
+      "name", "email", "rollNumber", "branch", "year", "section",
+      "skills", "interests", "resumeLink", "portfolioLink",
+    ];
+
+    const rows = profiles.map((p) => [
+      escape(p.userId?.name),
+      escape(p.userId?.email),
+      escape(p.rollNumber),
+      escape(p.branch),
+      escape(p.year),
+      escape(p.section),
+      escape((p.skills || []).join("; ")),
+      escape((p.interests || []).join("; ")),
+      escape(p.resumeLink),
+      escape(p.portfolioLink),
+    ].join(","));
+
+    const csv = [headers.join(","), ...rows].join("\r\n");
+
+    const filename = `students_${Date.now()}.csv`;
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(csv);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
