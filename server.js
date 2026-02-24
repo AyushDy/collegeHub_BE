@@ -13,8 +13,11 @@ const io = new Server(server, {
   cors: { origin: true, credentials: true },
 });
 
-// Attach socket handler
-require("./src/socket/index")(io);
+// Attach socket handler and expose quizHandler to REST controllers
+const socketModule = require("./src/socket/index");
+socketModule(io);
+// After socket init, io._quizHandler is set; make it accessible via app
+setImmediate(() => app.set("quizHandler", io._quizHandler));
 
 connectDB();
 
@@ -33,6 +36,8 @@ const groupRoutes = require("./src/routes/groupRoutes");
 const chatRoutes = require("./src/routes/chatRoutes");
 const threadRoutes = require("./src/routes/threadRoutes");
 const aiRoutes = require("./src/routes/aiRoutes");
+const quizRoutes = require("./src/routes/quizRoutes");
+const notificationRoutes = require("./src/routes/notificationRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
@@ -41,6 +46,8 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/threads", threadRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/quiz", quizRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

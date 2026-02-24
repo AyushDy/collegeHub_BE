@@ -24,13 +24,15 @@ Errors:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   SECTIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  auth.txt      — /api/auth
-  profile.txt   — /api/profile
-  groups.txt    — /api/groups
-  chat.txt      — /api/chat
-  threads.txt   — /api/threads
-  ai.txt        — /api/ai
-  socket.txt    — Socket.IO events
+  auth.txt           — /api/auth
+  profile.txt        — /api/profile
+  groups.txt         — /api/groups
+  chat.txt           — /api/chat
+  threads.txt        — /api/threads
+  ai.txt             — /api/ai
+  quiz.txt           — /api/quiz
+  notifications.txt  — /api/notifications
+  socket.txt         — Socket.IO events (groups, threads, quiz)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ROLE SUMMARY
@@ -69,5 +71,15 @@ Errors:
   POST   /api/ai/doubt-assist/:threadId       ✓     ✓     ✓
   GET    /api/ai/recommendations              ✓
   POST   /api/ai/study-suggestions            ✓     ✓     ✓
+  POST   /api/quiz                            ✓     ✓     ✓
+  POST   /api/quiz/:quizId/start              ✓*    ✓     ✓
+  GET    /api/quiz/:quizId                    ✓     ✓     ✓
+  GET    /api/quiz/:quizId/results            ✓     ✓     ✓
+  GET    /api/quiz/group/:groupId             ✓     ✓     ✓
+  GET    /api/notifications                   ✓     ✓     ✓
+  GET    /api/notifications/unread-count      ✓     ✓     ✓
+  PATCH  /api/notifications/read-all          ✓     ✓     ✓
+  PATCH  /api/notifications/:id/read          ✓     ✓     ✓
   ─────────────────────────────────────────────────────────
   * ownership enforced in controller (thread author only)
+  * /api/quiz/:quizId/start — creator (any role), FACULTY, or ADMIN

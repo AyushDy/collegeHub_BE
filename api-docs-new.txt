@@ -786,7 +786,7 @@ Errors:
 ================================================================================
 
 All AI endpoints require cookie-based JWT auth (protect middleware).
-The Gemini 1.5 Flash model is used for all AI generation.
+The Gemini 2.5 Flash model is used for all AI generation.
 Set GEMINI_API_KEY in your .env file.
 
 ────────────────────────────────────────────────────────────────────────────────
@@ -906,8 +906,8 @@ POST /api/ai/study-plan
 Middleware : protect  (requires cookie: token)
 Roles      : ADMIN | FACULTY | STUDENT
 
-Generates a personalised weekly study plan from a list of subjects. Not
-persisted — response is ephemeral.
+Generates a personalised weekly study plan and persists it to the database
+under the authenticated user.
 
 Request body (JSON):
   {
@@ -917,34 +917,103 @@ Request body (JSON):
     "goals"      : "string  — optional"
   }
 
-Success 200:
+Success 201:
   {
     "message": "Study plan generated",
-    "plan": {
-      "totalWeeks" : 3,
-      "dailyHours" : 4,
-      "weeklyPlan" : [
-        {
-          "week"         : 1,
-          "focus"        : "string",
-          "dailySchedule": [
-            {
-              "day"    : "Monday",
-              "subject": "Math",
-              "topics" : ["string", ...],
-              "hours"  : 2,
-              "task"   : "string"
-            }
-          ]
-        }
-      ],
-      "revisionStrategy": "string",
-      "tips"            : ["string", ...]
+    "studyPlan": {
+      "_id"        : "<ObjectId>",
+      "userId"     : "<ObjectId>",
+      "subjects"   : ["Math", "OS"],
+      "examDate"   : "ISO date | null",
+      "hoursPerDay": 4,
+      "goals"      : "string | null",
+      "plan": {
+        "totalWeeks" : 3,
+        "dailyHours" : 4,
+        "weeklyPlan" : [
+          {
+            "week"         : 1,
+            "focus"        : "string",
+            "dailySchedule": [
+              {
+                "day"    : "Monday",
+                "subject": "Math",
+                "topics" : ["string", ...],
+                "hours"  : 2,
+                "task"   : "string"
+              }
+            ]
+          }
+        ],
+        "revisionStrategy": "string",
+        "tips"            : ["string", ...]
+      },
+      "createdAt": "ISO date",
+      "updatedAt": "ISO date"
     }
   }
 
 Errors:
   400  { "message": "subjects array is required" }
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/ai/study-plan
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+
+Returns a summary list of all study plans saved by the authenticated user
+(subjects, examDate, hoursPerDay, goals, createdAt — no full plan payload).
+
+Request body : none
+
+Success 200:
+  {
+    "count"     : 2,
+    "studyPlans": [
+      {
+        "_id"        : "<ObjectId>",
+        "subjects"   : ["Math", "OS"],
+        "examDate"   : "ISO date | null",
+        "hoursPerDay": 4,
+        "goals"      : "string | null",
+        "createdAt"  : "ISO date"
+      },
+      ...
+    ]
+  }
+
+Errors:
+  500  { "error": "<message>" }
+
+────────────────────────────────────────────────────────────────────────────────
+GET /api/ai/study-plan/:planId
+────────────────────────────────────────────────────────────────────────────────
+Middleware : protect  (requires cookie: token)
+Roles      : ADMIN | FACULTY | STUDENT
+Note       : Only the owner of the study plan can fetch it.
+
+Path param:
+  planId — StudyPlan ObjectId
+
+Success 200:
+  {
+    "studyPlan": {
+      "_id"      : "<ObjectId>",
+      "userId"   : "<ObjectId>",
+      "subjects" : ["Math", "OS"],
+      "examDate" : "ISO date | null",
+      "hoursPerDay": 4,
+      "goals"    : "string | null",
+      "plan"     : { ...full plan JSON as described in POST response... },
+      "createdAt": "ISO date",
+      "updatedAt": "ISO date"
+    }
+  }
+
+Errors:
+  404  { "message": "Study plan not found" }
   500  { "error": "<message>" }
 
 ────────────────────────────────────────────────────────────────────────────────
@@ -1115,6 +1184,8 @@ Note: The socketRoom value returned by GET /api/groups/my and
   GET    /api/ai/roadmap                          ✓         ✓         ✓
   GET    /api/ai/roadmap/:roadmapId               ✓         ✓         ✓
   POST   /api/ai/study-plan                       ✓         ✓         ✓
+  GET    /api/ai/study-plan                       ✓         ✓         ✓
+  GET    /api/ai/study-plan/:planId               ✓         ✓         ✓
   POST   /api/ai/doubt-assist/:threadId           ✓         ✓         ✓
   GET    /api/ai/recommendations                  ✓
   POST   /api/ai/study-suggestions                ✓         ✓         ✓

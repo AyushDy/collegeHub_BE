@@ -5,8 +5,13 @@ const AcademicGroup = require("../models/AcademicGroup");
 const DiscussionThread = require("../models/DiscussionThread");
 const DiscussionReply = require("../models/DiscussionReply");
 const { getStudentGroups, isMember } = require("../utils/groupMembership");
+const buildQuizHandler = require("./quizHandler");
 
 module.exports = (io) => {
+  // Initialise quiz handler (registers socket events + exposes startQuizSession)
+  const quizHandler = buildQuizHandler(io);
+  // Store on `io` so the REST controller can reach startQuizSession via app.get()
+  io._quizHandler = quizHandler;
   // ─── Auth middleware for Socket.IO ─────────────────────────────────────────
   io.use((socket, next) => {
     try {
@@ -26,6 +31,9 @@ module.exports = (io) => {
 
   io.on("connection", (socket) => {
     console.log(`Socket connected: ${socket.user.userId}`);
+
+    // Register quiz socket event handlers for this socket
+    quizHandler.registerHandlers(socket);
 
     // ── joinGroup ─────────────────────────────────────────────────────────────
     socket.on("joinGroup", async ({ groupId }) => {

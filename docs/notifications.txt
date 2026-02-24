@@ -1,0 +1,81 @@
+NOTIFICATIONS  —  /api/notifications
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All endpoints require authentication (JWT cookie).
+Each user only sees their own notifications.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET /api/notifications
+  Roles   : STUDENT | FACULTY | ADMIN
+  Query   :
+    page        number  (default: 1)
+    limit       number  (default: 20, max: 100)
+    unreadOnly  boolean (default: false)
+  200     :
+    {
+      total,
+      page,
+      pages,
+      notifications: [
+        {
+          _id, type, isRead, createdAt,
+          targetGroupId,
+          payload: {
+            quizId: { _id, title, status, groupId },
+            title,
+            createdBy: { _id, email, role },
+            startAt
+          }
+        },
+        ...
+      ]
+    }
+    — sorted: unread first, then newest first
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  UNREAD COUNT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET /api/notifications/unread-count
+  Roles  : STUDENT | FACULTY | ADMIN
+  200    : { unreadCount: number }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MARK SINGLE AS READ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PATCH /api/notifications/:notificationId/read
+  Roles  : STUDENT | FACULTY | ADMIN
+  Params : notificationId — ObjectId
+  200    : { message, notification }
+  403    : "Access denied."           — notification belongs to another user
+  404    : "Notification not found."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MARK ALL AS READ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PATCH /api/notifications/read-all
+  Roles  : STUDENT | FACULTY | ADMIN
+  200    : { message, updated: number }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NOTIFICATION TYPES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QUIZ   — generated automatically when a quiz is created for a group
+           payload: { quizId, title, createdBy }
+  EVENT  — reserved for future use
+  CLUB   — reserved for future use
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DATA MODEL NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Notification
+    targetUserId    ref User     (recipient)
+    targetGroupId   ref AcademicGroup  (optional, group context)
+    type            QUIZ | EVENT | CLUB
+    payload
+      quizId        ref Quiz     (optional)
+      title         String       (optional)
+      createdBy     ref User     (optional)
+      startAt       Date         (optional)
+    isRead          Boolean      (default: false)
+    createdAt / updatedAt

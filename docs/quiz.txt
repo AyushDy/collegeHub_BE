@@ -1,0 +1,132 @@
+QUIZ  —  /api/quiz
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All endpoints require authentication (JWT cookie).
+Creator must be a member of the target group.
+correctIndex is never exposed while quiz status ≠ ENDED.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CREATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+POST /api/quiz
+  Roles  : STUDENT | FACULTY | ADMIN (must be group member)
+  Body   :
+    {
+      "title"   : string (3–200 chars),
+      "groupId" : ObjectId,
+      "questions": [
+        {
+          "text"         : string,
+          "options"      : string[]  (2–6 items),
+          "correctIndex" : number    (0-based index into options),
+          "timeLimit"    : number    (seconds, 5–300)
+        },
+        ...                          (1+ questions required)
+      ]
+    }
+  201    : { message, quiz }          — quiz returned WITHOUT correctIndex
+  400    : validation errors (missing fields, option count, index range, timeLimit range)
+  403    : "You are not a member of this group."
+  404    : "Group not found."
+
+  Side-effect: QUIZ notifications are fan-out created for every member of the group.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  START
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+POST /api/quiz/:quizId/start
+  Roles  : creator (any role) | FACULTY | ADMIN
+  Params : quizId — ObjectId of the quiz
+  200    : { message, quizId, status: "RUNNING" }
+  400    : "Quiz is already RUNNING." | "Quiz is already ENDED."
+  403    : "Only the quiz creator, faculty, or admin can start a quiz."
+  404    : "Quiz not found."
+
+  Side-effect: Triggers Socket.IO quiz sequence.
+               → quiz:announced emitted to the group room
+               → 10 s join window, then questions begin sequentially.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  METADATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET /api/quiz/:quizId
+  Roles  : STUDENT | FACULTY | ADMIN (must be group member)
+  200    : { quiz }
+           — questions returned WITHOUT correctIndex / stats while status ≠ ENDED
+           — questions include correctIndex + per-question stats once ENDED
+  403    : "You are not a member of this group."
+  404    : "Quiz not found."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RESULTS / LEADERBOARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET /api/quiz/:quizId/results
+  Roles  : STUDENT | FACULTY | ADMIN (must be group member)
+  200    :
+    {
+      quiz: { _id, title, groupId, status, startedAt, endedAt, questions[] },
+      leaderboard: [
+        { rank, userId: { _id, email, role }, score, totalResponseTimeMs, answers[] },
+        ...
+      ]
+    }
+    — sorted: score DESC, totalResponseTimeMs ASC (tie-breaker)
+    — answers[]: { questionIndex, selectedIndex, isCorrect, responseTimeMs }
+  400    : "Results are only available after the quiz has ended."
+  403    : "You are not a member of this group."
+  404    : "Quiz not found."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LIST QUIZZES FOR A GROUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET /api/quiz/group/:groupId
+  Roles  : STUDENT | FACULTY | ADMIN (must be group member)
+  200    :
+    {
+      count,
+      quizzes: [
+        { _id, title, status, questionCount, createdBy, roleOfCreator,
+          startedAt, endedAt, participantCount, createdAt },
+        ...
+      ]
+    }
+    — sorted newest first
+  403    : "You are not a member of this group."
+  404    : "Group not found."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QUIZ STATUS LIFECYCLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CREATED  →  POST /:quizId/start  →  RUNNING  →  (all questions done)  →  ENDED
+
+  CREATED  : quiz visible, not joinable via socket
+  RUNNING  : join window open, questions emitting
+  ENDED    : read-only; results and correctIndexes exposed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DATA MODEL NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Quiz
+    title          String   (3–200)
+    groupId        ref AcademicGroup
+    createdBy      ref User
+    roleOfCreator  STUDENT | FACULTY | ADMIN
+    status         CREATED | RUNNING | ENDED
+    questions[]
+      text          String
+      options[]     String   (2–6)
+      correctIndex  Number   (internal, hidden until ENDED)
+      timeLimit     Number   (5–300 s)
+      stats
+        optionCounts[]  Number   (parallel to options, filled after question closes)
+        correctCount    Number
+    participants[]
+      userId             ref User
+      score              Number
+      totalResponseTimeMs Number
+      answers[]
+        questionIndex   Number
+        selectedIndex   Number   (-1 = no answer / timeout)
+        isCorrect       Boolean
+        responseTimeMs  Number
+    startedAt   Date
+    endedAt     Date

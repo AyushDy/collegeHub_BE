@@ -13,9 +13,45 @@ CLIENT → SERVER
   resolveThread{ threadId }                            [author | FACULTY | ADMIN]
   acceptReply  { replyId }                             [STUDENT — thread author]
 
-SERVER → CLIENT
+  quiz:join    { quizId }                              [ALL — group member]
+  quiz:answer  { quizId, questionIndex, selectedIndex } [ALL — joined participant]
+
+SERVER → CLIENT  (groups / threads)
   newMessage      { _id, groupId, sender, message, isEdited, createdAt }
   newThread       { thread }                 → emitted to groupId room
   newReply        { threadId, reply }        → emitted to groupId room
   threadResolved  { threadId, resolvedBy }   → emitted to groupId room
   replyAccepted   { replyId, threadId }      → emitted to groupId room
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QUIZ EVENTS  (room: quiz:<quizId>)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+quiz:announced      Emitted to GROUP room when POST /api/quiz/:id/start is called.
+    { quizId, title, groupId, joinWindowMs, questionCount }
+    — clients should emit quiz:join within the join window (default 10 s).
+
+quiz:joined         Ack to the socket that emitted quiz:join.
+    { quizId, participantCount }
+
+quiz:question       Emitted to QUIZ room for each question (NO correctIndex).
+    { quizId, questionIndex, totalQuestions, text, options[], timeLimitSeconds }
+    — client starts a local countdown from timeLimitSeconds.
+
+quiz:answer-ack     Ack to the socket whose answer was accepted.
+    { quizId, questionIndex }
+    — only the first submission per user per question is accepted.
+
+quiz:score-update   Emitted to QUIZ room after each accepted answer.
+    { quizId, userId, score, totalResponseTimeMs }
+    — use to render a live score panel.
+
+quiz:question-result Emitted to QUIZ room after timeLimit expires (or all answered).
+    { quizId, questionIndex, correctIndex, optionCounts[], correctCount }
+    — optionCounts is parallel to options[]; correctCount = users who got it right.
+
+quiz:ended          Emitted to QUIZ room after all questions are done.
+    { quizId, leaderboard: [ { rank, userId, score, totalResponseTimeMs }, ... ] }
+    — sorted: score DESC, totalResponseTimeMs ASC (tie-breaker).
+
+quiz:error          Emitted to the requesting socket on any quiz error.
+    { message }
