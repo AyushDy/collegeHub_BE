@@ -33,6 +33,7 @@ Errors:
   quiz.txt           — /api/quiz
   notifications.txt  — /api/notifications
   resources.txt      — /api/resources
+  forums.txt         — /api/forums
   socket.txt         — Socket.IO events (groups, threads, quiz)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -88,7 +89,20 @@ Errors:
   GET    /api/resources/:resourceId             ✓     ✓     ✓
   GET    /api/resources/:resourceId/download    ✓     ✓     ✓
   DELETE /api/resources/:resourceId             ✓*    ✓     ✓
+  POST   /api/forums                            ✓     ✓     ✓
+  GET    /api/forums                             ✓     ✓     ✓
+  GET    /api/forums/:forumId                    ✓     ✓     ✓
+  DELETE /api/forums/:forumId                    ✓*    ✓     ✓
+  GET    /api/forums/:forumId/replies            ✓     ✓     ✓
+  POST   /api/forums/:forumId/replies            ✓     ✓     ✓
+  PUT    /api/forums/replies/:replyId            ✓*
+  DELETE /api/forums/replies/:replyId            ✓*    ✓     ✓
+  PATCH  /api/forums/:forumId/like               ✓     ✓     ✓
+  PATCH  /api/forums/:forumId/dislike            ✓     ✓     ✓
+  PATCH  /api/forums/replies/:replyId/like       ✓     ✓     ✓
+  PATCH  /api/forums/replies/:replyId/dislike    ✓     ✓     ✓
   ─────────────────────────────────────────────────────────
   * ownership enforced in controller (thread author only)
   * /api/quiz/:quizId/start — creator (any role), FACULTY, or ADMIN
   * DELETE /api/resources/:resourceId — uploader, FACULTY, or ADMIN
+  * DELETE /api/forums/:forumId — creator, FACULTY, or ADMIN

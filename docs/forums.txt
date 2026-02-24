@@ -1,0 +1,154 @@
+DISCUSSION FORUMS — /api/forums
+Public discussion threads open to all authenticated users.
+Pure REST — no sockets. Poll GET endpoints to refresh.
+Supports likes/dislikes on both forums and replies.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FORUM ENDPOINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── CREATE FORUM ───────────────────────────
+POST /api/forums
+Auth: any authenticated user
+
+Body (JSON):
+  title        (required)  string, max 200
+  description  (optional)  string, max 2000
+  topic        (optional)  string, max 100 — default "General"
+  tags         (optional)  comma-separated string or JSON array
+
+Success 201:
+{
+  "_id": "...",
+  "title": "Best practices for React state management",
+  "description": "Let's discuss Redux vs Zustand vs Context",
+  "topic": "Web Dev",
+  "tags": ["react", "state"],
+  "createdBy": { "_id": "...", "name": "...", "email": "...", "role": "STUDENT" },
+  "isActive": true,
+  "replyCount": 0,
+  "lastActivity": "...",
+  "likes": [],
+  "dislikes": [],
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+
+─── LIST / SEARCH FORUMS ──────────────────
+GET /api/forums
+Auth: any authenticated user
+
+Query params (all optional):
+  topic    partial match, case-insensitive
+  search   full-text search on title, topic, tags
+  mine     "true" — only forums created by me
+  page     default 1
+  limit    default 20, max 50
+
+Success 200:
+{
+  "forums": [ { ...forum, likesCount, dislikesCount } ],
+  "page": 1,
+  "pages": 5,
+  "total": 92
+}
+
+Sorted by lastActivity (most recent first).
+
+─── GET SINGLE FORUM ──────────────────────
+GET /api/forums/:forumId
+Auth: any authenticated user
+
+Success 200:
+{
+  ...forum,
+  "likesCount": 12,
+  "dislikesCount": 2,
+  "userLiked": true,
+  "userDisliked": false
+}
+
+─── DELETE FORUM ───────────────────────────
+DELETE /api/forums/:forumId
+Auth: creator, FACULTY, or ADMIN (soft-delete)
+
+Success 200: { "message": "Forum deleted" }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  REPLY ENDPOINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── GET REPLIES ────────────────────────────
+GET /api/forums/:forumId/replies
+Auth: any authenticated user
+
+Query params:
+  page    default 1
+  limit   default 50, max 100
+
+Success 200:
+{
+  "replies": [
+    {
+      "_id": "...",
+      "forumId": "...",
+      "author": { "_id": "...", "name": "...", "email": "...", "role": "STUDENT" },
+      "content": "I prefer Zustand for small projects",
+      "isEdited": false,
+      "likesCount": 5,
+      "dislikesCount": 0,
+      "userLiked": false,
+      "userDisliked": false,
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
+  "page": 1,
+  "pages": 3,
+  "total": 127
+}
+
+Replies returned in chronological order (oldest first).
+
+─── ADD REPLY ──────────────────────────────
+POST /api/forums/:forumId/replies
+Auth: any authenticated user
+
+Body: { "content": "..." }
+
+Success 201: { ...reply, likesCount: 0, dislikesCount: 0, userLiked: false, userDisliked: false }
+
+─── EDIT REPLY ─────────────────────────────
+PUT /api/forums/replies/:replyId
+Auth: reply author only
+
+Body: { "content": "..." }
+
+Success 200: { ...reply }
+
+─── DELETE REPLY ───────────────────────────
+DELETE /api/forums/replies/:replyId
+Auth: reply author, FACULTY, or ADMIN
+
+Success 200: { "message": "Reply deleted" }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LIKE / DISLIKE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All toggle-based: call once to add, call again to remove.
+Liking removes any existing dislike and vice versa.
+
+PATCH /api/forums/:forumId/like
+PATCH /api/forums/:forumId/dislike
+PATCH /api/forums/replies/:replyId/like
+PATCH /api/forums/replies/:replyId/dislike
+
+Auth: any authenticated user
+
+Success 200:
+{
+  "likesCount": 13,
+  "dislikesCount": 1,
+  "userLiked": true,
+  "userDisliked": false
+}

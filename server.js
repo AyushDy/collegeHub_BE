@@ -39,6 +39,7 @@ const aiRoutes = require("./src/routes/aiRoutes");
 const quizRoutes = require("./src/routes/quizRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const resourceRoutes = require("./src/routes/resourceRoutes");
+const forumRoutes = require("./src/routes/forumRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
@@ -50,6 +51,7 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/resources", resourceRoutes);
+app.use("/api/forums", forumRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
